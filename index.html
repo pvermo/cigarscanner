@@ -1,4 +1,1014 @@
-function printSaleReceipt() {
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cigar Scanner</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome pour les icônes -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Bibliothèque QR Code Scanner -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
+    <!-- jsPDF pour l'export PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Bibliothèque pour l'export CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- jsPDF-AutoTable pour les tableaux dans PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        .scanner-container {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        #reader {
+            width: 100%;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .card {
+            margin-bottom: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .tab-content {
+            padding: 20px 0;
+        }
+        .list-group-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .brand-badge {
+            font-size: 0.8em;
+            padding: 3px 8px;
+        }
+        .country-badge {
+            font-size: 0.8em;
+            padding: 3px 8px;
+            background-color: #6c757d;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 16px;
+            border-bottom: 1px solid #eee;
+        }
+        .tab-pane {
+            min-height: 60vh;
+        }
+        .group-header {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            padding: 10px 15px;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+        #history-content {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .history-day {
+            margin-bottom: 20px;
+        }
+        .history-cart {
+            margin: 10px 0;
+            cursor: pointer;
+        }
+        #stats-chart-container {
+            height: 300px;
+            margin: 20px 0;
+        }
+        .btn-scanner {
+            margin-top: 10px;
+        }
+        .alert-toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        #catalog-table th, #catalog-table td {
+            vertical-align: middle;
+        }
+        .print-only {
+            display: none;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block;
+            }
+            body {
+                padding: 0;
+                margin: 0;
+            }
+            .receipt {
+                width: 100%;
+                font-size: 12px;
+            }
+        }
+        /* Design responsif */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            .scanner-container {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-3 mb-5 no-print">
+        <h1 class="text-center mb-4">Cigar Scanner</h1>
+        
+        <!-- Onglets de navigation -->
+        <ul class="nav nav-tabs" id="mainTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="cart-tab" data-bs-toggle="tab" data-bs-target="#cart" type="button" role="tab" aria-controls="cart" aria-selected="true">
+                    <i class="fas fa-shopping-cart"></i> Panier
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="scanner-tab" data-bs-toggle="tab" data-bs-target="#scanner" type="button" role="tab" aria-controls="scanner" aria-selected="false">
+                    <i class="fas fa-qrcode"></i> Scanner
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-controls="history" aria-selected="false">
+                    <i class="fas fa-history"></i> Historique
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab" aria-controls="stats" aria-selected="false">
+                    <i class="fas fa-chart-bar"></i> Statistiques
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="catalog-tab" data-bs-toggle="tab" data-bs-target="#catalog" type="button" role="tab" aria-controls="catalog" aria-selected="false">
+                    <i class="fas fa-book"></i> Catalogue
+                </button>
+            </li>
+        </ul>
+
+        <!-- Contenu des onglets -->
+        <div class="tab-content" id="mainTabContent">
+            <!-- Onglet Panier -->
+            <div class="tab-pane fade show active" id="cart" role="tabpanel" aria-labelledby="cart-tab">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h3>Panier client</h3>
+                        <div class="card">
+                            <div class="card-body p-0">
+                                <div id="cartItems" class="list-group list-group-flush">
+                                    <!-- Les articles du panier seront ajoutés ici dynamiquement -->
+                                    <div class="list-group-item text-center text-muted">
+                                        Aucun article dans le panier
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <button class="btn btn-primary me-2" onclick="goToScanner()">
+                                <i class="fas fa-qrcode"></i> Scanner un cigare
+                            </button>
+                            <button class="btn btn-outline-primary me-2" onclick="groupCartByCountry()">
+                                <i class="fas fa-globe"></i> Grouper par pays
+                            </button>
+                            <button class="btn btn-outline-primary" onclick="groupCartByBrand()">
+                                <i class="fas fa-tag"></i> Grouper par marque
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card mt-3 mt-md-0">
+                            <div class="card-header">
+                                <h5 class="mb-0">Récapitulatif</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="summary-item">
+                                    <span>Articles:</span>
+                                    <span id="cartCount">0</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span>Total:</span>
+                                    <span id="cartTotal">0.00€</span>
+                                </div>
+                                <button id="validateCartBtn" class="btn btn-success w-100 mt-3" onclick="validateCart()" disabled>
+                                    <i class="fas fa-check"></i> Valider le panier
+                                </button>
+                                <button id="printCartBtn" class="btn btn-primary w-100 mt-2" onclick="printReceipt()" disabled>
+                                    <i class="fas fa-print"></i> Imprimer le ticket
+                                </button>
+                                <button id="clearCartBtn" class="btn btn-outline-danger w-100 mt-2" onclick="clearCart()" disabled>
+                                    <i class="fas fa-trash"></i> Vider le panier
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Onglet Scanner -->
+            <div class="tab-pane fade" id="scanner" role="tabpanel" aria-labelledby="scanner-tab">
+                <h3 class="mb-3">Scanner un QR code</h3>
+                
+                <div class="scanner-container">
+                    <div id="reader"></div>
+                    <div class="d-flex justify-content-center mb-3 mt-2">
+                        <button class="btn btn-primary me-2 btn-scanner" id="startButton" onclick="startScanner()">
+                            <i class="fas fa-play"></i> Démarrer le scan
+                        </button>
+                        <button class="btn btn-danger btn-scanner" id="stopButton" onclick="stopScanner()">
+                            <i class="fas fa-stop"></i> Arrêter
+                        </button>
+                    </div>
+                    
+                    <div class="card mt-3">
+                        <div class="card-header">Dernier scan</div>
+                        <div class="card-body">
+                            <div id="lastScanResult" class="mb-2">Aucun QR code scanné</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Onglet Historique -->
+            <div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Historique des ventes</h3>
+                    <div>
+                        <button class="btn btn-outline-primary me-2" onclick="exportHistoryCSV()">
+                            <i class="fas fa-file-csv"></i> Exporter CSV
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="exportHistoryPDF()">
+                            <i class="fas fa-file-pdf"></i> Exporter PDF
+                        </button>
+                    </div>
+                </div>
+                <div id="history-content">
+                    <!-- L'historique sera généré ici dynamiquement -->
+                </div>
+            </div>
+
+            <!-- Onglet Statistiques -->
+            <div class="tab-pane fade" id="stats" role="tabpanel" aria-labelledby="stats-tab">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Statistiques</h3>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary" onclick="showStats('day')">Jour</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="showStats('month')">Mois</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="showStats('year')">Année</button>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0" id="stats-title">Statistiques du jour</h5>
+                                <button class="btn btn-sm btn-outline-primary" onclick="exportStatsPDF()">
+                                    <i class="fas fa-file-pdf"></i> Exporter PDF
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="stats-chart-container">
+                                    <canvas id="statsChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Récapitulatif</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="summary-item">
+                                    <span>Ventes:</span>
+                                    <span id="statsSalesCount">0</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span>Articles vendus:</span>
+                                    <span id="statsItemsCount">0</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span>Total:</span>
+                                    <span id="statsTotal">0.00€</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h5 class="mb-0">Top Marques</h5>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush" id="topBrands">
+                                    <!-- Top marques générées dynamiquement -->
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h5 class="mb-0">Top Pays</h5>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="list-group list-group-flush" id="topCountries">
+                                    <!-- Top pays générés dynamiquement -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Onglet Catalogue -->
+            <div class="tab-pane fade" id="catalog" role="tabpanel" aria-labelledby="catalog-tab">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Catalogue de Produits</h3>
+                    <div>
+                        <button class="btn btn-outline-primary me-2" onclick="exportCatalogCSV()">
+                            <i class="fas fa-file-csv"></i> Exporter CSV
+                        </button>
+                        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                            <i class="fas fa-plus"></i> Ajouter un produit
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover" id="catalog-table">
+                                <thead>
+                                    <tr>
+                                        <th>Marque</th>
+                                        <th>Nom</th>
+                                        <th>Pays</th>
+                                        <th>Prix</th>
+                                        <th>QR Code</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="catalog-items">
+                                    <!-- Les produits du catalogue seront ajoutés ici dynamiquement -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section d'impression du ticket -->
+    <div class="receipt print-only" id="receipt-print-area">
+        <div style="text-align: center; margin-bottom: 15px;">
+            <h3 style="margin: 5px 0;">Cigar Shop</h3>
+            <p style="margin: 2px 0;">Facture</p>
+            <p style="margin: 2px 0;" id="receipt-date"></p>
+        </div>
+        
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+            <thead>
+                <tr style="border-bottom: 1px solid #000;">
+                    <th style="text-align: left; padding: 5px;">Description</th>
+                    <th style="text-align: right; padding: 5px;">Prix</th>
+                </tr>
+            </thead>
+            <tbody id="receipt-items">
+                <!-- Les éléments du ticket seront ajoutés ici -->
+            </tbody>
+            <tfoot>
+                <tr style="border-top: 1px solid #000;">
+                    <th style="text-align: left; padding: 5px;">Total</th>
+                    <th style="text-align: right; padding: 5px;" id="receipt-total"></th>
+                </tr>
+            </tfoot>
+        </table>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <p style="margin: 2px 0;">Merci de votre achat !</p>
+        </div>
+    </div>
+
+    <!-- Modal de confirmation -->
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmModalLabel">Confirmation</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="confirmModalBody">
+                    Êtes-vous sûr de vouloir valider ce panier ?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" id="confirmModalBtn">Confirmer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de détails de vente -->
+    <div class="modal fade" id="saleDetailsModal" tabindex="-1" aria-labelledby="saleDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="saleDetailsModalLabel">Détails de la vente</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="saleDetailsDate" class="mb-3"></div>
+                    <div id="saleDetailsTotal" class="mb-3 fw-bold"></div>
+                    <div id="saleDetailsItems"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                    <button type="button" class="btn btn-primary" onclick="printSaleReceipt()">
+                        <i class="fas fa-print"></i> Imprimer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal d'ajout de produit -->
+    <div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addProductModalLabel">Ajouter un produit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addProductForm">
+                        <div class="mb-3">
+                            <label for="productBrand" class="form-label">Marque</label>
+                            <input type="text" class="form-control" id="productBrand" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="productName" class="form-label">Nom</label>
+                            <input type="text" class="form-control" id="productName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="productCountry" class="form-label">Pays d'origine</label>
+                            <input type="text" class="form-control" id="productCountry" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="productPrice" class="form-label">Prix (€)</label>
+                            <input type="number" class="form-control" id="productPrice" step="0.01" min="0" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" onclick="addProductToCatalog()">Ajouter</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal d'édition de produit -->
+    <div class="modal fade" id="editProductModal" tabindex="-1" aria-labelledby="editProductModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editProductModalLabel">Modifier un produit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editProductForm">
+                        <input type="hidden" id="editProductId">
+                        <div class="mb-3">
+                            <label for="editProductBrand" class="form-label">Marque</label>
+                            <input type="text" class="form-control" id="editProductBrand" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editProductName" class="form-label">Nom</label>
+                            <input type="text" class="form-control" id="editProductName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editProductCountry" class="form-label">Pays d'origine</label>
+                            <input type="text" class="form-control" id="editProductCountry" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editProductPrice" class="form-label">Prix (€)</label>
+                            <input type="number" class="form-control" id="editProductPrice" step="0.01" min="0" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" onclick="updateProduct()">Enregistrer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap et Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    
+    <script>
+        // Modèles de données
+        class Cigar {
+            constructor(brand, name, country, price) {
+                this.brand = brand;
+                this.name = name;
+                this.country = country;
+                this.price = parseFloat(price);
+                this.id = Date.now() + Math.random().toString(36).substr(2, 9);
+            }
+        }
+
+        class Cart {
+            constructor() {
+                this.items = [];
+                this.date = new Date();
+                this.validated = false;
+            }
+
+            addItem(cigar) {
+                this.items.push(cigar);
+            }
+
+            removeItem(id) {
+                const index = this.items.findIndex(item => item.id === id);
+                if (index !== -1) {
+                    this.items.splice(index, 1);
+                }
+            }
+
+            getTotal() {
+                return this.items.reduce((total, item) => total + item.price, 0);
+            }
+
+            validate() {
+                this.validated = true;
+            }
+
+            clear() {
+                this.items = [];
+            }
+        }
+
+        // Variables globales
+        let currentCart = new Cart();
+        let salesHistory = [];
+        let productCatalog = [];
+        let html5QrCode = null;
+        let lastScannedCigar = null;
+        let statsChart = null;
+        let currentSaleToPrint = null;
+        let currentStatsPeriod = 'day';
+
+        // Chargement initial
+        window.onload = function() {
+            loadFromLocalStorage();
+            renderCart();
+            renderHistory();
+            renderCatalog();
+            initializeStatsChart();
+            showStats('day');
+
+            // Initialisation des variables PDF
+            window.jsPDF = window.jspdf.jsPDF;
+        };
+
+        // Sauvegarde locale
+        function saveToLocalStorage() {
+            localStorage.setItem('currentCart', JSON.stringify(currentCart));
+            localStorage.setItem('salesHistory', JSON.stringify(salesHistory));
+            localStorage.setItem('productCatalog', JSON.stringify(productCatalog));
+        }
+
+        function loadFromLocalStorage() {
+            const savedCart = localStorage.getItem('currentCart');
+            const savedHistory = localStorage.getItem('salesHistory');
+            const savedCatalog = localStorage.getItem('productCatalog');
+            
+            if (savedCart) {
+                const parsedCart = JSON.parse(savedCart);
+                currentCart = new Cart();
+                currentCart.date = new Date(parsedCart.date);
+                currentCart.validated = parsedCart.validated;
+                currentCart.items = parsedCart.items;
+            }
+            
+            if (savedHistory) {
+                salesHistory = JSON.parse(savedHistory);
+                // Convertir les dates string en objets Date
+                salesHistory.forEach(sale => {
+                    sale.date = new Date(sale.date);
+                });
+            }
+            
+            if (savedCatalog) {
+                productCatalog = JSON.parse(savedCatalog);
+            } else {
+                // Catalogue par défaut
+                productCatalog = [
+                    { id: "cat1", brand: "Cohiba", name: "Robusto", country: "Cuba", price: 25.50 },
+                    { id: "cat2", brand: "Montecristo", name: "No. 2", country: "Cuba", price: 22.00 },
+                    { id: "cat3", brand: "Davidoff", name: "Grand Cru", country: "République Dominicaine", price: 30.75 },
+                    { id: "cat4", brand: "Padron", name: "1964 Anniversary", country: "Nicaragua", price: 28.90 },
+                    { id: "cat5", brand: "Arturo Fuente", name: "Opus X", country: "République Dominicaine", price: 35.00 }
+                ];
+                saveToLocalStorage();
+            }
+            
+            updateCartButtons();
+        }
+
+        // Navigation
+        function goToScanner() {
+            document.getElementById('scanner-tab').click();
+        }
+
+        // Gestion du scanner
+        function startScanner() {
+            if (html5QrCode === null) {
+                html5QrCode = new Html5Qrcode("reader");
+            }
+            
+            const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+                processQRCode(decodedText);
+            };
+            
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            
+            html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
+                .catch(err => {
+                    console.error('Erreur lors du démarrage du scanner:', err);
+                    showToast('Erreur lors du démarrage de la caméra. Vérifiez les permissions.', 'danger');
+                });
+        }
+
+        function stopScanner() {
+            if (html5QrCode !== null && html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => {
+                    console.log('Scanner arrêté');
+                }).catch(err => {
+                    console.error('Erreur lors de l\'arrêt du scanner:', err);
+                });
+            }
+        }
+
+        function processQRCode(qrCodeData) {
+            document.getElementById('lastScanResult').innerHTML = qrCodeData;
+            
+            try {
+                // Format attendu: Marque: XXX|Cigare: YYY|Pays: ZZZ|Prix: 99.99
+                const parts = qrCodeData.split('|');
+                const brand = parts[0].split(': ')[1];
+                const name = parts[1].split(': ')[1];
+                const country = parts[2].split(': ')[1];
+                const price = parts[3].split(': ')[1];
+                
+                lastScannedCigar = new Cigar(brand, name, country, price);
+                
+                // Ajouter au panier
+                currentCart.addItem(lastScannedCigar);
+                
+                // Mettre à jour l'affichage
+                renderCart();
+                
+                // Sauvegarder
+                saveToLocalStorage();
+                
+                // Notification
+                showToast(`${brand} ${name} ajouté au panier`, 'success');
+                
+                // Revenir à l'onglet panier
+                document.getElementById('cart-tab').click();
+            } catch (error) {
+                console.error('Format QR code invalide:', error);
+                showToast('Format QR code invalide', 'danger');
+            }
+        }
+
+        // Affichage du panier
+        function renderCart() {
+            const cartItemsEl = document.getElementById('cartItems');
+            const cartCountEl = document.getElementById('cartCount');
+            const cartTotalEl = document.getElementById('cartTotal');
+            
+            if (currentCart.items.length === 0) {
+                cartItemsEl.innerHTML = `
+                    <div class="list-group-item text-center text-muted">
+                        Aucun article dans le panier
+                    </div>
+                `;
+            } else {
+                cartItemsEl.innerHTML = '';
+                currentCart.items.forEach(item => {
+                    cartItemsEl.innerHTML += `
+                        <div class="list-group-item">
+                            <div>
+                                <div class="fw-bold">${item.brand} - ${item.name}</div>
+                                <div class="small">
+                                    <span class="badge bg-secondary country-badge">${item.country}</span>
+                                    <span class="badge bg-primary brand-badge">${item.brand}</span>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">${item.price.toFixed(2)}€</div>
+                                <button class="btn btn-sm btn-outline-danger" onclick="removeFromCart('${item.id}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            cartCountEl.textContent = currentCart.items.length;
+            cartTotalEl.textContent = `${currentCart.getTotal().toFixed(2)}€`;
+            
+            updateCartButtons();
+        }
+
+        function updateCartButtons() {
+            const hasItems = currentCart.items.length > 0;
+            document.getElementById('validateCartBtn').disabled = !hasItems;
+            document.getElementById('printCartBtn').disabled = !hasItems;
+            document.getElementById('clearCartBtn').disabled = !hasItems;
+        }
+
+        function removeFromCart(id) {
+            currentCart.removeItem(id);
+            renderCart();
+            saveToLocalStorage();
+            showToast('Article retiré du panier', 'warning');
+        }
+
+        function clearCart() {
+            showConfirmDialog(
+                'Vider le panier',
+                'Êtes-vous sûr de vouloir vider le panier ?',
+                () => {
+                    currentCart.clear();
+                    renderCart();
+                    saveToLocalStorage();
+                    showToast('Panier vidé', 'warning');
+                }
+            );
+        }
+
+        // Groupement du panier
+        function groupCartByCountry() {
+            if (currentCart.items.length === 0) return;
+            
+            const cartItemsEl = document.getElementById('cartItems');
+            cartItemsEl.innerHTML = '';
+            
+            // Grouper par pays
+            const groups = {};
+            currentCart.items.forEach(item => {
+                if (!groups[item.country]) {
+                    groups[item.country] = [];
+                }
+                groups[item.country].push(item);
+            });
+            
+            // Afficher les groupes
+            for (const country in groups) {
+                cartItemsEl.innerHTML += `
+                    <div class="group-header">${country} (${groups[country].length})</div>
+                `;
+                
+                groups[country].forEach(item => {
+                    cartItemsEl.innerHTML += `
+                        <div class="list-group-item">
+                            <div>
+                                <div class="fw-bold">${item.brand} - ${item.name}</div>
+                                <div class="small">
+                                    <span class="badge bg-primary brand-badge">${item.brand}</span>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">${item.price.toFixed(2)}€</div>
+                                <button class="btn btn-sm btn-outline-danger" onclick="removeFromCart('${item.id}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        function groupCartByBrand() {
+            if (currentCart.items.length === 0) return;
+            
+            const cartItemsEl = document.getElementById('cartItems');
+            cartItemsEl.innerHTML = '';
+            
+            // Grouper par marque
+            const groups = {};
+            currentCart.items.forEach(item => {
+                if (!groups[item.brand]) {
+                    groups[item.brand] = [];
+                }
+                groups[item.brand].push(item);
+            });
+            
+            // Afficher les groupes
+            for (const brand in groups) {
+                cartItemsEl.innerHTML += `
+                    <div class="group-header">${brand} (${groups[brand].length})</div>
+                `;
+                
+                groups[brand].forEach(item => {
+                    cartItemsEl.innerHTML += `
+                        <div class="list-group-item">
+                            <div>
+                                <div class="fw-bold">${item.name}</div>
+                                <div class="small">
+                                    <span class="badge bg-secondary country-badge">${item.country}</span>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">${item.price.toFixed(2)}€</div>
+                                <button class="btn btn-sm btn-outline-danger" onclick="removeFromCart('${item.id}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        // Validation du panier
+        function validateCart() {
+            showConfirmDialog(
+                'Valider le panier',
+                `Valider le panier de ${currentCart.items.length} articles pour un total de ${currentCart.getTotal().toFixed(2)}€ ?`,
+                () => {
+                    // Créer une copie du panier actuel
+                    const validatedCart = JSON.parse(JSON.stringify(currentCart));
+                    validatedCart.date = new Date();
+                    validatedCart.validated = true;
+                    
+                    // Ajouter à l'historique
+                    salesHistory.push(validatedCart);
+                    
+                    // Réinitialiser le panier
+                    currentCart = new Cart();
+                    
+                    // Sauvegarder et rafraîchir
+                    saveToLocalStorage();
+                    renderCart();
+                    renderHistory();
+                    showStats(currentStatsPeriod);
+                    
+                    showToast('Panier validé avec succès', 'success');
+                }
+            );
+        }
+
+        // Gestion de l'historique
+        function renderHistory() {
+            const historyContent = document.getElementById('history-content');
+            
+            if (salesHistory.length === 0) {
+                historyContent.innerHTML = `
+                    <div class="alert alert-info">
+                        Aucune vente dans l'historique
+                    </div>
+                `;
+                return;
+            }
+            
+            // Grouper par jour
+            const salesByDay = {};
+            salesHistory.forEach(sale => {
+                const dateKey = new Date(sale.date).toLocaleDateString();
+                if (!salesByDay[dateKey]) {
+                    salesByDay[dateKey] = [];
+                }
+                salesByDay[dateKey].push(sale);
+            });
+            
+            // Afficher l'historique
+            historyContent.innerHTML = '';
+            for (const dateKey in salesByDay) {
+                const sales = salesByDay[dateKey];
+                let dayTotal = 0;
+                let itemsCount = 0;
+                
+                sales.forEach(sale => {
+                    dayTotal += sale.items.reduce((total, item) => total + item.price, 0);
+                    itemsCount += sale.items.length;
+                });
+                
+                historyContent.innerHTML += `
+                    <div class="history-day">
+                        <div class="group-header d-flex justify-content-between">
+                            <span>${dateKey}</span>
+                            <span>${sales.length} ventes | ${itemsCount} articles | ${dayTotal.toFixed(2)}€</span>
+                        </div>
+                        <div class="history-sales">
+                            ${sales.map((sale, index) => {
+                                const saleTime = new Date(sale.date).toLocaleTimeString();
+                                const saleTotal = sale.items.reduce((total, item) => total + item.price, 0);
+                                const saleItems = sale.items.length;
+                                
+                                return `
+                                    <div class="card history-cart" onclick="showSaleDetails(${salesHistory.indexOf(sale)})">
+                                        <div class="card-body py-2">
+                                            <div class="d-flex justify-content-between">
+                                                <div>
+                                                    <span class="fw-bold">Vente #${index + 1}</span>
+                                                    <span class="text-muted ms-2">${saleTime}</span>
+                                                </div>
+                                                <div>
+                                                    <span class="badge bg-primary">${saleItems} articles</span>
+                                                    <span class="fw-bold ms-2">${saleTotal.toFixed(2)}€</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function showSaleDetails(saleIndex) {
+            const sale = salesHistory[saleIndex];
+            const saleDate = new Date(sale.date).toLocaleString();
+            const saleTotal = sale.items.reduce((total, item) => total + item.price, 0);
+            
+            document.getElementById('saleDetailsDate').textContent = `Date: ${saleDate}`;
+            document.getElementById('saleDetailsTotal').textContent = `Total: ${saleTotal.toFixed(2)}€`;
+            
+            // Afficher les articles
+            const saleItemsEl = document.getElementById('saleDetailsItems');
+            saleItemsEl.innerHTML = `
+                <div class="list-group">
+                    ${sale.items.map(item => `
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold">${item.brand} - ${item.name}</div>
+                                <div class="small">
+                                    <span class="badge bg-secondary country-badge">${item.country}</span>
+                                </div>
+                            </div>
+                            <div>${item.price.toFixed(2)}€</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            // Stocker la vente courante pour l'impression
+            currentSaleToPrint = sale;
+            
+            // Afficher la modal
+            const modal = new bootstrap.Modal(document.getElementById('saleDetailsModal'));
+            modal.show();
+        }
+
+        // Impression et export
+        function printReceipt() {
+            // Préparer le contenu du ticket
+            const receiptDate = document.getElementById('receipt-date');
+            const receiptItems = document.getElementById('receipt-items');
+            const receiptTotal = document.getElementById('receipt-total');
+            
+            receiptDate.textContent = new Date().toLocaleString();
+            receiptItems.innerHTML = '';
+            
+            currentCart.items.forEach(item => {
+                receiptItems.innerHTML += `
+                    <tr>
+                        <td style="text-align: left; padding: 5px;">${item.brand} - ${item.name}</td>
+                        <td style="text-align: right; padding: 5px;">${item.price.toFixed(2)}€</td>
+                    </tr>
+                `;
+            });
+            
+            receiptTotal.textContent = `${currentCart.getTotal().toFixed(2)}€`;
+            
+            // Imprimer
+            window.print();
+        }
+
+        function printSaleReceipt() {
             if (!currentSaleToPrint) return;
             
             // Préparer le contenu du ticket
