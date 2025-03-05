@@ -74,7 +74,16 @@
         }
         .history-cart {
             margin: 10px 0;
+        }
+        .cursor-pointer {
             cursor: pointer;
+        }
+        .history-cart .card-body {
+            padding: 0.5rem 1rem;
+        }
+        .history-cart .btn-outline-danger {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
         }
         #stats-chart-container {
             height: 300px;
@@ -638,11 +647,18 @@
 
         // Gestion du scanner
         function startScanner() {
+            // Si le scanner est déjà en cours, l'arrêter d'abord
+            if (html5QrCode !== null && html5QrCode.isScanning) {
+                stopScanner();
+            }
+            
             if (html5QrCode === null) {
                 html5QrCode = new Html5Qrcode("reader");
             }
             
             const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+                // Arrêter le scanner immédiatement après un scan réussi
+                stopScanner();
                 processQRCode(decodedText);
             };
             
@@ -925,18 +941,22 @@
                                 const saleTime = new Date(sale.date).toLocaleTimeString();
                                 const saleTotal = sale.items.reduce((total, item) => total + item.price, 0);
                                 const saleItems = sale.items.length;
+                                const saleIndex = salesHistory.indexOf(sale);
                                 
                                 return `
-                                    <div class="card history-cart" onclick="showSaleDetails(${salesHistory.indexOf(sale)})">
+                                    <div class="card history-cart">
                                         <div class="card-body py-2">
                                             <div class="d-flex justify-content-between">
-                                                <div>
+                                                <div class="cursor-pointer" onclick="showSaleDetails(${saleIndex})">
                                                     <span class="fw-bold">Vente #${index + 1}</span>
                                                     <span class="text-muted ms-2">${saleTime}</span>
                                                 </div>
                                                 <div>
                                                     <span class="badge bg-primary">${saleItems} articles</span>
                                                     <span class="fw-bold ms-2">${saleTotal.toFixed(2)}€</span>
+                                                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteSaleFromHistory(${saleIndex})">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -951,6 +971,8 @@
 
         function showSaleDetails(saleIndex) {
             const sale = salesHistory[saleIndex];
+            if (!sale) return;
+            
             const saleDate = new Date(sale.date).toLocaleString();
             const saleTotal = sale.items.reduce((total, item) => total + item.price, 0);
             
@@ -981,6 +1003,22 @@
             // Afficher la modal
             const modal = new bootstrap.Modal(document.getElementById('saleDetailsModal'));
             modal.show();
+        }
+
+        function deleteSaleFromHistory(saleIndex) {
+            showConfirmDialog(
+                'Supprimer la vente',
+                'Êtes-vous sûr de vouloir supprimer cette vente de l\'historique ?',
+                () => {
+                    if (saleIndex >= 0 && saleIndex < salesHistory.length) {
+                        salesHistory.splice(saleIndex, 1);
+                        saveToLocalStorage();
+                        renderHistory();
+                        showStats(currentStatsPeriod);
+                        showToast('Vente supprimée avec succès', 'warning');
+                    }
+                }
+            );
         }
 
         // Impression et export
@@ -1114,7 +1152,6 @@
             // Enregistrer le PDF
             doc.save('historique_ventes.pdf');
         }
-
         function exportCatalogCSV() {
             if (productCatalog.length === 0) {
                 showToast('Aucune donnée à exporter', 'warning');
