@@ -1,675 +1,662 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cigar Scanner</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome pour les icônes -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <!-- Bibliothèque QR Code Scanner -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.4/html5-qrcode.min.js"></script>
-    <!-- jsPDF pour l'export PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- Bibliothèque pour l'export CSV -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <!-- jsPDF-AutoTable pour les tableaux dans PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-    <style>
-        .scanner-container {
-            width: 100%;
-            max-width: 500px;
-            margin: 0 auto;
+function printSaleReceipt() {
+            if (!currentSaleToPrint) return;
+            
+            // Préparer le contenu du ticket
+            const receiptDate = document.getElementById('receipt-date');
+            const receiptItems = document.getElementById('receipt-items');
+            const receiptTotal = document.getElementById('receipt-total');
+            
+            receiptDate.textContent = new Date(currentSaleToPrint.date).toLocaleString();
+            receiptItems.innerHTML = '';
+            
+            currentSaleToPrint.items.forEach(item => {
+                receiptItems.innerHTML += `
+                    <tr>
+                        <td style="text-align: left; padding: 5px;">${item.brand} - ${item.name}</td>
+                        <td style="text-align: right; padding: 5px;">${item.price.toFixed(2)}€</td>
+                    </tr>
+                `;
+            });
+            
+            const saleTotal = currentSaleToPrint.items.reduce((total, item) => total + item.price, 0);
+            receiptTotal.textContent = `${saleTotal.toFixed(2)}€`;
+            
+            // Imprimer
+            window.print();
         }
-        #reader {
-            width: 100%;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        .card {
-            margin-bottom: 15px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .tab-content {
-            padding: 20px 0;
-        }
-        .list-group-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .brand-badge {
-            font-size: 0.8em;
-            padding: 3px 8px;
-        }
-        .country-badge {
-            font-size: 0.8em;
-            padding: 3px 8px;
-            background-color: #6c757d;
-        }
-        .summary-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 16px;
-            border-bottom: 1px solid #eee;
-        }
-        .tab-pane {
-            min-height: 60vh;
-        }
-        .group-header {
-            background-color: #f8f9fa;
-            font-weight: bold;
-            padding: 10px 15px;
-            margin-top: 10px;
-            border-radius: 5px;
-        }
-        #history-content {
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-        .history-day {
-            margin-bottom: 20px;
-        }
-        .history-cart {
-            margin: 10px 0;
-            cursor: pointer;
-        }
-        #stats-chart-container {
-            height: 300px;
-            margin: 20px 0;
-        }
-        .btn-scanner {
-            margin-top: 10px;
-        }
-        .alert-toast {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 9999;
-        }
-        #catalog-table th, #catalog-table td {
-            vertical-align: middle;
-        }
-        .print-only {
-            display: none;
-        }
-        @media print {
-            .no-print {
-                display: none !important;
-            }
-            .print-only {
-                display: block;
-            }
-            body {
-                padding: 0;
-                margin: 0;
-            }
-            .receipt {
-                width: 100%;
-                font-size: 12px;
-            }
-        }
-        /* Design responsif */
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-            .scanner-container {
-                max-width: 100%;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container mt-3 mb-5 no-print">
-        <h1 class="text-center mb-4">Cigar Scanner</h1>
-        
-        <!-- Onglets de navigation -->
-        <ul class="nav nav-tabs" id="mainTab" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="cart-tab" data-bs-toggle="tab" data-bs-target="#cart" type="button" role="tab" aria-controls="cart" aria-selected="true">
-                    <i class="fas fa-shopping-cart"></i> Panier
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="scanner-tab" data-bs-toggle="tab" data-bs-target="#scanner" type="button" role="tab" aria-controls="scanner" aria-selected="false">
-                    <i class="fas fa-qrcode"></i> Scanner
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-controls="history" aria-selected="false">
-                    <i class="fas fa-history"></i> Historique
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab" aria-controls="stats" aria-selected="false">
-                    <i class="fas fa-chart-bar"></i> Statistiques
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="catalog-tab" data-bs-toggle="tab" data-bs-target="#catalog" type="button" role="tab" aria-controls="catalog" aria-selected="false">
-                    <i class="fas fa-book"></i> Catalogue
-                </button>
-            </li>
-        </ul>
 
-        <!-- Contenu des onglets -->
-        <div class="tab-content" id="mainTabContent">
-            <!-- Onglet Panier -->
-            <div class="tab-pane fade show active" id="cart" role="tabpanel" aria-labelledby="cart-tab">
-                <div class="row">
-                    <div class="col-md-8">
-                        <h3>Panier client</h3>
-                        <div class="card">
-                            <div class="card-body p-0">
-                                <div id="cartItems" class="list-group list-group-flush">
-                                    <!-- Les articles du panier seront ajoutés ici dynamiquement -->
-                                    <div class="list-group-item text-center text-muted">
-                                        Aucun article dans le panier
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-3">
-                            <button class="btn btn-primary me-2" onclick="goToScanner()">
-                                <i class="fas fa-qrcode"></i> Scanner un cigare
-                            </button>
-                            <button class="btn btn-outline-primary me-2" onclick="groupCartByCountry()">
-                                <i class="fas fa-globe"></i> Grouper par pays
-                            </button>
-                            <button class="btn btn-outline-primary" onclick="groupCartByBrand()">
-                                <i class="fas fa-tag"></i> Grouper par marque
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-4">
-                        <div class="card mt-3 mt-md-0">
-                            <div class="card-header">
-                                <h5 class="mb-0">Récapitulatif</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="summary-item">
-                                    <span>Articles:</span>
-                                    <span id="cartCount">0</span>
-                                </div>
-                                <div class="summary-item">
-                                    <span>Total:</span>
-                                    <span id="cartTotal">0.00€</span>
-                                </div>
-                                <button id="validateCartBtn" class="btn btn-success w-100 mt-3" onclick="validateCart()" disabled>
-                                    <i class="fas fa-check"></i> Valider le panier
-                                </button>
-                                <button id="printCartBtn" class="btn btn-primary w-100 mt-2" onclick="printReceipt()" disabled>
-                                    <i class="fas fa-print"></i> Imprimer le ticket
-                                </button>
-                                <button id="clearCartBtn" class="btn btn-outline-danger w-100 mt-2" onclick="clearCart()" disabled>
-                                    <i class="fas fa-trash"></i> Vider le panier
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Onglet Scanner -->
-            <div class="tab-pane fade" id="scanner" role="tabpanel" aria-labelledby="scanner-tab">
-                <h3 class="mb-3">Scanner un QR code</h3>
+        // Export de données
+        function exportHistoryCSV() {
+            if (salesHistory.length === 0) {
+                showToast('Aucune donnée à exporter', 'warning');
+                return;
+            }
+            
+            // Préparer les données
+            const csvData = [];
+            
+            // En-têtes
+            csvData.push(['Date', 'Heure', 'Marque', 'Cigare', 'Pays', 'Prix']);
+            
+            // Données
+            salesHistory.forEach(sale => {
+                const saleDate = new Date(sale.date).toLocaleDateString();
+                const saleTime = new Date(sale.date).toLocaleTimeString();
                 
-                <div class="scanner-container">
-                    <div id="reader"></div>
-                    <div class="d-flex justify-content-center mb-3 mt-2">
-                        <button class="btn btn-primary me-2 btn-scanner" id="startButton" onclick="startScanner()">
-                            <i class="fas fa-play"></i> Démarrer le scan
-                        </button>
-                        <button class="btn btn-danger btn-scanner" id="stopButton" onclick="stopScanner()">
-                            <i class="fas fa-stop"></i> Arrêter
-                        </button>
-                    </div>
-                    
-                    <div class="card mt-3">
-                        <div class="card-header">Dernier scan</div>
-                        <div class="card-body">
-                            <div id="lastScanResult" class="mb-2">Aucun QR code scanné</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                sale.items.forEach(item => {
+                    csvData.push([
+                        saleDate,
+                        saleTime,
+                        item.brand,
+                        item.name,
+                        item.country,
+                        item.price.toFixed(2)
+                    ]);
+                });
+            });
+            
+            // Créer le fichier CSV
+            const csv = Papa.unparse(csvData);
+            downloadFile(csv, 'historique_ventes.csv', 'text/csv');
+        }
 
-            <!-- Onglet Historique -->
-            <div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3>Historique des ventes</h3>
-                    <div>
-                        <button class="btn btn-outline-primary me-2" onclick="exportHistoryCSV()">
-                            <i class="fas fa-file-csv"></i> Exporter CSV
-                        </button>
-                        <button class="btn btn-outline-primary" onclick="exportHistoryPDF()">
-                            <i class="fas fa-file-pdf"></i> Exporter PDF
-                        </button>
-                    </div>
-                </div>
-                <div id="history-content">
-                    <!-- L'historique sera généré ici dynamiquement -->
-                </div>
-            </div>
-
-            <!-- Onglet Statistiques -->
-            <div class="tab-pane fade" id="stats" role="tabpanel" aria-labelledby="stats-tab">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3>Statistiques</h3>
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-outline-primary" onclick="showStats('day')">Jour</button>
-                        <button type="button" class="btn btn-outline-primary" onclick="showStats('month')">Mois</button>
-                        <button type="button" class="btn btn-outline-primary" onclick="showStats('year')">Année</button>
-                    </div>
-                </div>
+        function exportHistoryPDF() {
+            if (salesHistory.length === 0) {
+                showToast('Aucune donnée à exporter', 'warning');
+                return;
+            }
+            
+            // Créer le PDF
+            const doc = new jsPDF();
+            
+            // Titre
+            doc.setFontSize(18);
+            doc.text('Historique des ventes', 14, 20);
+            
+            // Date
+            doc.setFontSize(12);
+            doc.text(`Exporté le ${new Date().toLocaleString()}`, 14, 30);
+            
+            // Préparer les données
+            const tableData = [];
+            
+            salesHistory.forEach(sale => {
+                const saleDate = new Date(sale.date).toLocaleString();
                 
-                <div class="row">
-                    <div class="col-md-8">
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0" id="stats-title">Statistiques du jour</h5>
-                                <button class="btn btn-sm btn-outline-primary" onclick="exportStatsPDF()">
-                                    <i class="fas fa-file-pdf"></i> Exporter PDF
-                                </button>
-                            </div>
-                            <div class="card-body">
-                                <div id="stats-chart-container">
-                                    <canvas id="statsChart"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0">Récapitulatif</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="summary-item">
-                                    <span>Ventes:</span>
-                                    <span id="statsSalesCount">0</span>
-                                </div>
-                                <div class="summary-item">
-                                    <span>Articles vendus:</span>
-                                    <span id="statsItemsCount">0</span>
-                                </div>
-                                <div class="summary-item">
-                                    <span>Total:</span>
-                                    <span id="statsTotal">0.00€</span>
-                                </div>
-                            </div>
-                        </div>
+                sale.items.forEach(item => {
+                    tableData.push([
+                        saleDate,
+                        item.brand,
+                        item.name,
+                        item.country,
+                        `${item.price.toFixed(2)}€`
+                    ]);
+                });
+            });
+            
+            // Créer le tableau
+            doc.autoTable({
+                startY: 40,
+                head: [['Date', 'Marque', 'Cigare', 'Pays', 'Prix']],
+                body: tableData
+            });
+            
+            // Enregistrer le PDF
+            doc.save('historique_ventes.pdf');
+        }
+
+        function exportCatalogCSV() {
+            if (productCatalog.length === 0) {
+                showToast('Aucune donnée à exporter', 'warning');
+                return;
+            }
+            
+            // Préparer les données
+            const csvData = [];
+            
+            // En-têtes
+            csvData.push(['Marque', 'Cigare', 'Pays', 'Prix']);
+            
+            // Données
+            productCatalog.forEach(product => {
+                csvData.push([
+                    product.brand,
+                    product.name,
+                    product.country,
+                    product.price.toFixed(2)
+                ]);
+            });
+            
+            // Créer le fichier CSV
+            const csv = Papa.unparse(csvData);
+            downloadFile(csv, 'catalogue_produits.csv', 'text/csv');
+        }
+
+        function downloadFile(content, fileName, contentType) {
+            const blob = new Blob([content], { type: contentType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Statistiques
+        function initializeStatsChart() {
+            const ctx = document.getElementById('statsChart').getContext('2d');
+            statsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Ventes (€)',
+                        data: [],
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function showStats(period) {
+            currentStatsPeriod = period;
+            
+            // Mise à jour du titre
+            let title = 'Statistiques';
+            switch (period) {
+                case 'day':
+                    title += ' du jour';
+                    break;
+                case 'month':
+                    title += ' du mois';
+                    break;
+                case 'year':
+                    title += ' de l\'année';
+                    break;
+            }
+            document.getElementById('stats-title').textContent = title;
+            
+            // Filtrer les données selon la période
+            const now = new Date();
+            const filteredSales = salesHistory.filter(sale => {
+                const saleDate = new Date(sale.date);
+                switch (period) {
+                    case 'day':
+                        return saleDate.getDate() === now.getDate() &&
+                               saleDate.getMonth() === now.getMonth() &&
+                               saleDate.getFullYear() === now.getFullYear();
+                    case 'month':
+                        return saleDate.getMonth() === now.getMonth() &&
+                               saleDate.getFullYear() === now.getFullYear();
+                    case 'year':
+                        return saleDate.getFullYear() === now.getFullYear();
+                    default:
+                        return true;
+                }
+            });
+            
+            // Statistiques générales
+            let totalSales = filteredSales.length;
+            let totalItems = 0;
+            let totalAmount = 0;
+            
+            filteredSales.forEach(sale => {
+                totalItems += sale.items.length;
+                totalAmount += sale.items.reduce((total, item) => total + item.price, 0);
+            });
+            
+            document.getElementById('statsSalesCount').textContent = totalSales;
+            document.getElementById('statsItemsCount').textContent = totalItems;
+            document.getElementById('statsTotal').textContent = `${totalAmount.toFixed(2)}€`;
+            
+            // Préparation des données pour le graphique
+            let labels = [];
+            let data = [];
+            
+            if (filteredSales.length > 0) {
+                switch (period) {
+                    case 'day':
+                        // Grouper par heure
+                        for (let i = 0; i < 24; i++) {
+                            const hour = i.toString().padStart(2, '0') + ':00';
+                            labels.push(hour);
+                            
+                            const hourSales = filteredSales.filter(sale => 
+                                new Date(sale.date).getHours() === i
+                            );
+                            
+                            const hourTotal = hourSales.reduce((total, sale) => 
+                                total + sale.items.reduce((t, item) => t + item.price, 0)
+                            , 0);
+                            
+                            data.push(hourTotal);
+                        }
+                        break;
                         
-                        <div class="card mt-3">
-                            <div class="card-header">
-                                <h5 class="mb-0">Top Marques</h5>
-                            </div>
-                            <div class="card-body p-0">
-                                <ul class="list-group list-group-flush" id="topBrands">
-                                    <!-- Top marques générées dynamiquement -->
-                                </ul>
-                            </div>
-                        </div>
+                    case 'month':
+                        // Grouper par jour
+                        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                        for (let i = 1; i <= daysInMonth; i++) {
+                            labels.push(i.toString());
+                            
+                            const daySales = filteredSales.filter(sale => 
+                                new Date(sale.date).getDate() === i
+                            );
+                            
+                            const dayTotal = daySales.reduce((total, sale) => 
+                                total + sale.items.reduce((t, item) => t + item.price, 0)
+                            , 0);
+                            
+                            data.push(dayTotal);
+                        }
+                        break;
                         
-                        <div class="card mt-3">
-                            <div class="card-header">
-                                <h5 class="mb-0">Top Pays</h5>
-                            </div>
-                            <div class="card-body p-0">
-                                <ul class="list-group list-group-flush" id="topCountries">
-                                    <!-- Top pays générés dynamiquement -->
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Onglet Catalogue -->
-            <div class="tab-pane fade" id="catalog" role="tabpanel" aria-labelledby="catalog-tab">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3>Catalogue de Produits</h3>
-                    <div>
-                        <button class="btn btn-outline-primary me-2" onclick="exportCatalogCSV()">
-                            <i class="fas fa-file-csv"></i> Exporter CSV
-                        </button>
-                        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addProductModal">
-                            <i class="fas fa-plus"></i> Ajouter un produit
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped table-hover" id="catalog-table">
-                                <thead>
-                                    <tr>
-                                        <th>Marque</th>
-                                        <th>Nom</th>
-                                        <th>Pays</th>
-                                        <th>Prix</th>
-                                        <th>QR Code</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="catalog-items">
-                                    <!-- Les produits du catalogue seront ajoutés ici dynamiquement -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Section d'impression du ticket -->
-    <div class="receipt print-only" id="receipt-print-area">
-        <div style="text-align: center; margin-bottom: 15px;">
-            <h3 style="margin: 5px 0;">Cigar Shop</h3>
-            <p style="margin: 2px 0;">Facture</p>
-            <p style="margin: 2px 0;" id="receipt-date"></p>
-        </div>
-        
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
-            <thead>
-                <tr style="border-bottom: 1px solid #000;">
-                    <th style="text-align: left; padding: 5px;">Description</th>
-                    <th style="text-align: right; padding: 5px;">Prix</th>
-                </tr>
-            </thead>
-            <tbody id="receipt-items">
-                <!-- Les éléments du ticket seront ajoutés ici -->
-            </tbody>
-            <tfoot>
-                <tr style="border-top: 1px solid #000;">
-                    <th style="text-align: left; padding: 5px;">Total</th>
-                    <th style="text-align: right; padding: 5px;" id="receipt-total"></th>
-                </tr>
-            </tfoot>
-        </table>
-        
-        <div style="text-align: center; margin-top: 20px;">
-            <p style="margin: 2px 0;">Merci de votre achat !</p>
-        </div>
-    </div>
-
-    <!-- Modal de confirmation -->
-    <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="confirmModalLabel">Confirmation</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body" id="confirmModalBody">
-                    Êtes-vous sûr de vouloir valider ce panier ?
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="button" class="btn btn-primary" id="confirmModalBtn">Confirmer</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal de détails de vente -->
-    <div class="modal fade" id="saleDetailsModal" tabindex="-1" aria-labelledby="saleDetailsModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="saleDetailsModalLabel">Détails de la vente</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="saleDetailsDate" class="mb-3"></div>
-                    <div id="saleDetailsTotal" class="mb-3 fw-bold"></div>
-                    <div id="saleDetailsItems"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                    <button type="button" class="btn btn-primary" onclick="printSaleReceipt()">
-                        <i class="fas fa-print"></i> Imprimer
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal d'ajout de produit -->
-    <div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="addProductModalLabel">Ajouter un produit</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="addProductForm">
-                        <div class="mb-3">
-                            <label for="productBrand" class="form-label">Marque</label>
-                            <input type="text" class="form-control" id="productBrand" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="productName" class="form-label">Nom</label>
-                            <input type="text" class="form-control" id="productName" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="productCountry" class="form-label">Pays d'origine</label>
-                            <input type="text" class="form-control" id="productCountry" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="productPrice" class="form-label">Prix (€)</label>
-                            <input type="number" class="form-control" id="productPrice" step="0.01" min="0" required>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="button" class="btn btn-primary" onclick="addProductToCatalog()">Ajouter</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal d'édition de produit -->
-    <div class="modal fade" id="editProductModal" tabindex="-1" aria-labelledby="editProductModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editProductModalLabel">Modifier un produit</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="editProductForm">
-                        <input type="hidden" id="editProductId">
-                        <div class="mb-3">
-                            <label for="editProductBrand" class="form-label">Marque</label>
-                            <input type="text" class="form-control" id="editProductBrand" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="editProductName" class="form-label">Nom</label>
-                            <input type="text" class="form-control" id="editProductName" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="editProductCountry" class="form-label">Pays d'origine</label>
-                            <input type="text" class="form-control" id="editProductCountry" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="editProductPrice" class="form-label">Prix (€)</label>
-                            <input type="number" class="form-control" id="editProductPrice" step="0.01" min="0" required>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="button" class="btn btn-primary" onclick="updateProduct()">Enregistrer</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bootstrap et Chart.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
-    
-    <script>
-        // Modèles de données
-        class Cigar {
-            constructor(brand, name, country, price) {
-                this.brand = brand;
-                this.name = name;
-                this.country = country;
-                this.price = parseFloat(price);
-                this.id = Date.now() + Math.random().toString(36).substr(2, 9);
-            }
-        }
-
-        class Cart {
-            constructor() {
-                this.items = [];
-                this.date = new Date();
-                this.validated = false;
-            }
-
-            addItem(cigar) {
-                this.items.push(cigar);
-            }
-
-            removeItem(id) {
-                const index = this.items.findIndex(item => item.id === id);
-                if (index !== -1) {
-                    this.items.splice(index, 1);
+                    case 'year':
+                        // Grouper par mois
+                        const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+                        for (let i = 0; i < 12; i++) {
+                            labels.push(monthNames[i]);
+                            
+                            const monthSales = filteredSales.filter(sale => 
+                                new Date(sale.date).getMonth() === i
+                            );
+                            
+                            const monthTotal = monthSales.reduce((total, sale) => 
+                                total + sale.items.reduce((t, item) => t + item.price, 0)
+                            , 0);
+                            
+                            data.push(monthTotal);
+                        }
+                        break;
                 }
             }
-
-            getTotal() {
-                return this.items.reduce((total, item) => total + item.price, 0);
-            }
-
-            validate() {
-                this.validated = true;
-            }
-
-            clear() {
-                this.items = [];
-            }
+            
+            // Mise à jour du graphique
+            statsChart.data.labels = labels;
+            statsChart.data.datasets[0].data = data;
+            statsChart.update();
+            
+            // Top marques et pays
+            updateTopItems(filteredSales);
         }
 
-        // Variables globales
-        let currentCart = new Cart();
-        let salesHistory = [];
-        let productCatalog = [];
-        let html5QrCode = null;
-        let lastScannedCigar = null;
-        let statsChart = null;
-        let currentSaleToPrint = null;
-        let currentStatsPeriod = 'day';
-
-        // Chargement initial
-        window.onload = function() {
-            loadFromLocalStorage();
-            renderCart();
-            renderHistory();
-            renderCatalog();
-            initializeStatsChart();
-            showStats('day');
-
-            // Initialisation des variables PDF
-            window.jsPDF = window.jspdf.jsPDF;
-        };
-
-        // Sauvegarde locale
-        function saveToLocalStorage() {
-            localStorage.setItem('currentCart', JSON.stringify(currentCart));
-            localStorage.setItem('salesHistory', JSON.stringify(salesHistory));
-            localStorage.setItem('productCatalog', JSON.stringify(productCatalog));
-        }
-
-        function loadFromLocalStorage() {
-            const savedCart = localStorage.getItem('currentCart');
-            const savedHistory = localStorage.getItem('salesHistory');
-            const savedCatalog = localStorage.getItem('productCatalog');
+        function updateTopItems(sales) {
+            const topBrandsEl = document.getElementById('topBrands');
+            const topCountriesEl = document.getElementById('topCountries');
             
-            if (savedCart) {
-                const parsedCart = JSON.parse(savedCart);
-                currentCart = new Cart();
-                currentCart.date = new Date(parsedCart.date);
-                currentCart.validated = parsedCart.validated;
-                currentCart.items = parsedCart.items;
-            }
+            // Compter les occurrences
+            const brandCount = {};
+            const countryCount = {};
             
-            if (savedHistory) {
-                salesHistory = JSON.parse(savedHistory);
-                // Convertir les dates string en objets Date
-                salesHistory.forEach(sale => {
-                    sale.date = new Date(sale.date);
+            sales.forEach(sale => {
+                sale.items.forEach(item => {
+                    // Marques
+                    if (!brandCount[item.brand]) {
+                        brandCount[item.brand] = { count: 0, total: 0 };
+                    }
+                    brandCount[item.brand].count++;
+                    brandCount[item.brand].total += item.price;
+                    
+                    // Pays
+                    if (!countryCount[item.country]) {
+                        countryCount[item.country] = { count: 0, total: 0 };
+                    }
+                    countryCount[item.country].count++;
+                    countryCount[item.country].total += item.price;
+                });
+            });
+            
+            // Trier et limiter à 5
+            const topBrands = Object.entries(brandCount)
+                .sort((a, b) => b[1].count - a[1].count)
+                .slice(0, 5);
+                
+            const topCountries = Object.entries(countryCount)
+                .sort((a, b) => b[1].count - a[1].count)
+                .slice(0, 5);
+            
+            // Afficher les top marques
+            if (topBrands.length === 0) {
+                topBrandsEl.innerHTML = `
+                    <li class="list-group-item text-center text-muted">
+                        Aucune donnée disponible
+                    </li>
+                `;
+            } else {
+                topBrandsEl.innerHTML = '';
+                topBrands.forEach(([brand, stats]) => {
+                    topBrandsEl.innerHTML += `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-bold">${brand}</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-primary rounded-pill">${stats.count}</span>
+                                <span class="ms-2">${stats.total.toFixed(2)}€</span>
+                            </div>
+                        </li>
+                    `;
                 });
             }
             
-            if (savedCatalog) {
-                productCatalog = JSON.parse(savedCatalog);
+            // Afficher les top pays
+            if (topCountries.length === 0) {
+                topCountriesEl.innerHTML = `
+                    <li class="list-group-item text-center text-muted">
+                        Aucune donnée disponible
+                    </li>
+                `;
             } else {
-                // Catalogue par défaut
-                productCatalog = [
-                    { id: "cat1", brand: "Cohiba", name: "Robusto", country: "Cuba", price: 25.50 },
-                    { id: "cat2", brand: "Montecristo", name: "No. 2", country: "Cuba", price: 22.00 },
-                    { id: "cat3", brand: "Davidoff", name: "Grand Cru", country: "République Dominicaine", price: 30.75 },
-                    { id: "cat4", brand: "Padron", name: "1964 Anniversary", country: "Nicaragua", price: 28.90 },
-                    { id: "cat5", brand: "Arturo Fuente", name: "Opus X", country: "République Dominicaine", price: 35.00 }
-                ];
-                saveToLocalStorage();
+                topCountriesEl.innerHTML = '';
+                topCountries.forEach(([country, stats]) => {
+                    topCountriesEl.innerHTML += `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="fw-bold">${country}</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-secondary rounded-pill">${stats.count}</span>
+                                <span class="ms-2">${stats.total.toFixed(2)}€</span>
+                            </div>
+                        </li>
+                    `;
+                });
             }
-            
-            updateCartButtons();
         }
 
-        // Navigation
-        function goToScanner() {
-            document.getElementById('scanner-tab').click();
-        }
-
-        // Gestion du scanner
-        function startScanner() {
-            if (html5QrCode === null) {
-                html5QrCode = new Html5Qrcode("reader");
+        function exportStatsPDF() {
+            // Créer le PDF
+            const doc = new jsPDF();
+            
+            // Titre
+            doc.setFontSize(18);
+            doc.text('Statistiques de vente', 14, 20);
+            
+            // Période
+            let periodText = '';
+            switch (currentStatsPeriod) {
+                case 'day':
+                    periodText = 'du jour';
+                    break;
+                case 'month':
+                    periodText = 'du mois';
+                    break;
+                case 'year':
+                    periodText = 'de l\'année';
+                    break;
             }
             
-            const qrCodeSuccessCallback = (decodedText, decodedResult) => {
-                processQRCode(decodedText);
+            doc.setFontSize(14);
+            doc.text(`Période: ${periodText} (${new Date().toLocaleDateString()})`, 14, 30);
+            
+            // Récapitulatif
+            doc.setFontSize(12);
+            doc.text(`Nombre de ventes: ${document.getElementById('statsSalesCount').textContent}`, 14, 45);
+            doc.text(`Articles vendus: ${document.getElementById('statsItemsCount').textContent}`, 14, 52);
+            doc.text(`Montant total: ${document.getElementById('statsTotal').textContent}`, 14, 59);
+            
+            // Enregistrer le PDF
+            doc.save(`statistiques_${currentStatsPeriod}.pdf`);
+        }
+
+        // Gestion du catalogue
+        function renderCatalog() {
+            const catalogItemsEl = document.getElementById('catalog-items');
+            
+            if (productCatalog.length === 0) {
+                catalogItemsEl.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center">Aucun produit dans le catalogue</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            catalogItemsEl.innerHTML = '';
+            productCatalog.forEach(product => {
+                catalogItemsEl.innerHTML += `
+                    <tr>
+                        <td>${product.brand}</td>
+                        <td>${product.name}</td>
+                        <td>${product.country}</td>
+                        <td>${product.price.toFixed(2)}€</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="generateQRCode('${product.id}')">
+                                <i class="fas fa-qrcode"></i> Générer
+                            </button>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-secondary me-1" onclick="editProduct('${product.id}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteProduct('${product.id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function addProductToCatalog() {
+            const brand = document.getElementById('productBrand').value.trim();
+            const name = document.getElementById('productName').value.trim();
+            const country = document.getElementById('productCountry').value.trim();
+            const price = parseFloat(document.getElementById('productPrice').value);
+            
+            if (!brand || !name || !country || isNaN(price)) {
+                showToast('Veuillez remplir tous les champs', 'danger');
+                return;
+            }
+            
+            const newProduct = {
+                id: Date.now() + Math.random().toString(36).substr(2, 9),
+                brand,
+                name,
+                country,
+                price
             };
             
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            productCatalog.push(newProduct);
+            saveToLocalStorage();
+            renderCatalog();
             
-            html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback);
+            // Fermer la modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addProductModal'));
+            modal.hide();
+            
+            // Réinitialiser le formulaire
+            document.getElementById('addProductForm').reset();
+            
+            showToast('Produit ajouté avec succès', 'success');
         }
 
-        function stopScanner() {
-            if (html5QrCode !== null && html5QrCode.isScanning) {
-                html5QrCode.stop().then(() => {
-                    console.log('Scanner arrêté');
-                }).catch(err => {
-                    console.error('Erreur lors de l\'arrêt du scanner:', err);
-                });
+        function editProduct(productId) {
+            const product = productCatalog.find(p => p.id === productId);
+            
+            if (!product) {
+                showToast('Produit non trouvé', 'danger');
+                return;
+            }
+            
+            // Remplir le formulaire
+            document.getElementById('editProductId').value = product.id;
+            document.getElementById('editProductBrand').value = product.brand;
+            document.getElementById('editProductName').value = product.name;
+            document.getElementById('editProductCountry').value = product.country;
+            document.getElementById('editProductPrice').value = product.price.toFixed(2);
+            
+            // Afficher la modal
+            const modal = new bootstrap.Modal(document.getElementById('editProductModal'));
+            modal.show();
+        }
+
+        function updateProduct() {
+            const id = document.getElementById('editProductId').value;
+            const brand = document.getElementById('editProductBrand').value.trim();
+            const name = document.getElementById('editProductName').value.trim();
+            const country = document.getElementById('editProductCountry').value.trim();
+            const price = parseFloat(document.getElementById('editProductPrice').value);
+            
+            if (!id || !brand || !name || !country || isNaN(price)) {
+                showToast('Veuillez remplir tous les champs', 'danger');
+                return;
+            }
+            
+            // Trouver et mettre à jour le produit
+            const index = productCatalog.findIndex(p => p.id === id);
+            if (index !== -1) {
+                productCatalog[index] = {
+                    id,
+                    brand,
+                    name,
+                    country,
+                    price
+                };
+                
+                saveToLocalStorage();
+                renderCatalog();
+                
+                // Fermer la modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editProductModal'));
+                modal.hide();
+                
+                showToast('Produit mis à jour avec succès', 'success');
+            } else {
+                showToast('Produit non trouvé', 'danger');
             }
         }
 
-        function processQRCode(qrCodeData) {
-            document.getElementById('lastScanResult').innerHTML = qrCodeData;
+        function deleteProduct(productId) {
+            showConfirmDialog(
+                'Supprimer le produit',
+                'Êtes-vous sûr de vouloir supprimer ce produit du catalogue ?',
+                () => {
+                    const index = productCatalog.findIndex(p => p.id === productId);
+                    if (index !== -1) {
+                        productCatalog.splice(index, 1);
+                        saveToLocalStorage();
+                        renderCatalog();
+                        showToast('Produit supprimé avec succès', 'warning');
+                    }
+                }
+            );
+        }
+
+        function generateQRCode(productId) {
+            const product = productCatalog.find(p => p.id === productId);
             
-            try {
-                // Format attendu: Marque: XXX|Cigare: YYY|Pays: ZZZ|Prix: 99.99
-                const parts = qrCodeData.split('|');
-                const brand = parts[0].split(': ')[1];
-                const name = parts[1].split(': ')[1];
-                const country = parts[2].split(': ')[1];
-                const price = parts[3].split(': ')[1];
-                
-                lastScannedCigar = new Cigar(brand, name, country, price);
+            if (!product) {
+                showToast('Produit non trouvé', 'danger');
+                return;
+            }
+            
+            // Créer le contenu du QR code
+            const qrContent = `Marque: ${product.brand}|Cigare: ${product.name}|Pays: ${product.country}|Prix: ${product.price.toFixed(2)}`;
+            
+            // URL pour générer un QR code via une API externe
+            const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrContent)}`;
+            
+            // Créer une fenêtre pop-up avec le QR code
+            const popupWindow = window.open('', '_blank', 'width=400,height=500');
+            popupWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>QR Code - ${product.brand} ${product.name}</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            text-align: center;
+                            padding: 20px;
+                        }
+                        h2 {
+                            margin-bottom: 5px;
+                        }
+                        p {
+                            margin: 5px 0;
+                            color: #666;
+                        }
+                        img {
+                            margin: 20px 0;
+                            max-width: 100%;
+                        }
+                        button {
+                            background-color: #4CAF50;
+                            border: none;
+                            color: white;
+                            padding: 10px 20px;
+                            text-align: center;
+                            text-decoration: none;
+                            display: inline-block;
+                            font-size: 16px;
+                            margin: 10px 2px;
+                            cursor: pointer;
+                            border-radius: 4px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h2>${product.brand} - ${product.name}</h2>
+                    <p>Pays: ${product.country}</p>
+                    <p>Prix: ${product.price.toFixed(2)}€</p>
+                    <img src="${qrCodeUrl}" alt="QR Code">
+                    <br>
+                    <button onclick="window.print()">Imprimer</button>
+                </body>
+                </html>
+            `);
+        }
+
+        // Fonctions utilitaires
+        function showToast(message, type = 'info') {
+            // Créer l'élément toast
+            const toast = document.createElement('div');
+            toast.className = `alert alert-${type} alert-toast`;
+            toast.innerHTML = message;
+            
+            // Ajouter au DOM
+            document.body.appendChild(toast);
+            
+            // Supprimer après 3 secondes
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        function showConfirmDialog(title, message, callback) {
+            const modalLabel = document.getElementById('confirmModalLabel');
+            const modalBody = document.getElementById('confirmModalBody');
+            const confirmBtn = document.getElementById('confirmModalBtn');
+            
+            modalLabel.textContent = title;
+            modalBody.textContent = message;
+            
+            // Supprimer les anciens event listeners
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            
+            // Ajouter le nouveau event listener
+            newConfirmBtn.addEventListener('click', () => {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+                modal.hide();
+                callback();
+            });
+            
+            // Afficher la modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+            modal.show();
+        }
+    </script>
+</body>
+</html>
