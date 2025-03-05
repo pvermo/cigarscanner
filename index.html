@@ -380,35 +380,75 @@
     </div>
 
     <!-- Section d'impression du ticket -->
-    <div class="receipt print-only" id="receipt-print-area">
-        <div style="text-align: center; margin-bottom: 15px;">
-            <h3 style="margin: 5px 0;">Cigar Shop</h3>
-            <p style="margin: 2px 0;">Facture</p>
-            <p style="margin: 2px 0;" id="receipt-date"></p>
+<!-- Mise à jour de la section d'impression du ticket avec les coordonnées et mentions légales -->
+<div class="receipt print-only" id="receipt-print-area">
+    <div style="text-align: center; margin-bottom: 5px;">
+        <h3 style="margin: 5px 0;">Le Diplomate</h3>
+        <p style="margin: 2px 0;">Cave à cigares</p>
+        <p style="margin: 2px 0;">99 rue du président Edouard Herriot</p>
+        <p style="margin: 2px 0;">69002 LYON</p>
+        <p style="margin: 2px 0;">SIRET: 818811481</p>
+        <p style="margin: 2px 0;">Tél: 04 78 42 38 05</p>
+    </div>
+    
+    <div style="margin: 15px 0; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between;">
+            <div>
+                <strong>Facture N°: </strong><span id="receipt-number"></span>
+            </div>
+            <div>
+                <strong>Date: </strong><span id="receipt-date"></span>
+            </div>
         </div>
-        
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
-            <thead>
-                <tr style="border-bottom: 1px solid #000;">
-                    <th style="text-align: left; padding: 5px;">Description</th>
-                    <th style="text-align: right; padding: 5px;">Prix</th>
-                </tr>
-            </thead>
-            <tbody id="receipt-items">
-                <!-- Les éléments du ticket seront ajoutés ici -->
-            </tbody>
-            <tfoot>
-                <tr style="border-top: 1px solid #000;">
-                    <th style="text-align: left; padding: 5px;">Total</th>
-                    <th style="text-align: right; padding: 5px;" id="receipt-total"></th>
-                </tr>
-            </tfoot>
-        </table>
-        
-        <div style="text-align: center; margin-top: 20px;">
-            <p style="margin: 2px 0;">Merci de votre achat !</p>
+        <div id="receipt-customer" style="margin-top: 10px;"></div>
+    </div>
+    
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+        <thead>
+            <tr style="border-bottom: 1px solid #000;">
+                <th style="text-align: left; padding: 5px;">Description</th>
+                <th style="text-align: right; padding: 5px;">Prix TTC</th>
+            </tr>
+        </thead>
+        <tbody id="receipt-items">
+            <!-- Les éléments du ticket seront ajoutés ici -->
+        </tbody>
+        <tfoot>
+            <tr style="border-top: 1px solid #000;">
+                <th style="text-align: left; padding: 5px;">Total TTC</th>
+                <th style="text-align: right; padding: 5px;" id="receipt-total"></th>
+            </tr>
+        </tfoot>
+    </table>
+    
+    <div style="margin-bottom: 15px;">
+        <strong>Mode de paiement: </strong><span id="receipt-payment"></span>
+    </div>
+    
+    <div style="text-align: center; margin-top: 20px; font-size: 0.8em; color: #666;">
+        <p style="margin: 2px 0;">TVA non applicable, art. 293 B du CGI</p>
+        <p style="margin: 2px 0;">En cas de retard de paiement, indemnité forfaitaire de 40€ (art. L441-6 du Code de Commerce)</p>
+        <p style="margin: 5px 0;">Merci de votre achat !</p>
+    </div>
+</div>
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paymentModalLabel">Choisir le mode de paiement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="paymentModalBody">
+                <!-- Le contenu sera généré dynamiquement -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" id="confirmPaymentBtn">Confirmer</button>
+            </div>
         </div>
     </div>
+</div>
+
 
     <!-- Modal de confirmation -->
     <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
@@ -430,27 +470,28 @@
     </div>
 
     <!-- Modal de détails de vente -->
-    <div class="modal fade" id="saleDetailsModal" tabindex="-1" aria-labelledby="saleDetailsModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="saleDetailsModalLabel">Détails de la vente</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="saleDetailsDate" class="mb-3"></div>
-                    <div id="saleDetailsTotal" class="mb-3 fw-bold"></div>
-                    <div id="saleDetailsItems"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                    <button type="button" class="btn btn-primary" onclick="printSaleReceipt()">
-                        <i class="fas fa-print"></i> Imprimer
-                    </button>
-                </div>
+<div class="modal fade" id="saleDetailsModal" tabindex="-1" aria-labelledby="saleDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="saleDetailsModalLabel">Détails de la vente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="saleDetailsDate" class="mb-3"></div>
+                <div id="saleDetailsTotal" class="mb-3 fw-bold"></div>
+                <div id="saleDetailsPayment" class="mb-3"></div>
+                <div id="saleDetailsItems"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-primary" onclick="printSaleReceipt()">
+                    <i class="fas fa-print"></i> Imprimer
+                </button>
             </div>
         </div>
     </div>
+</div>
 
     <!-- Modal d'ajout de produit -->
     <div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
@@ -541,11 +582,12 @@
             }
         }
 
-        class Cart {
+       class Cart {
             constructor() {
                 this.items = [];
                 this.date = new Date();
                 this.validated = false;
+                this.paymentMethod = ""; // Nouvelle propriété pour le mode de paiement
             }
 
             addItem(cigar) {
@@ -867,33 +909,67 @@
             }
         }
 
-        // Validation du panier
-        function validateCart() {
-            showConfirmDialog(
-                'Valider le panier',
-                `Valider le panier de ${currentCart.items.length} articles pour un total de ${currentCart.getTotal().toFixed(2)}€ ?`,
-                () => {
-                    // Créer une copie du panier actuel
-                    const validatedCart = JSON.parse(JSON.stringify(currentCart));
-                    validatedCart.date = new Date();
-                    validatedCart.validated = true;
-                    
-                    // Ajouter à l'historique
-                    salesHistory.push(validatedCart);
-                    
-                    // Réinitialiser le panier
-                    currentCart = new Cart();
-                    
-                    // Sauvegarder et rafraîchir
-                    saveToLocalStorage();
-                    renderCart();
-                    renderHistory();
-                    showStats(currentStatsPeriod);
-                    
-                    showToast('Panier validé avec succès', 'success');
-                }
-            );
-        }
+function validateCart() {
+    // Afficher une boîte de dialogue personnalisée pour choisir le mode de paiement
+    const modalTitle = document.getElementById('paymentModalLabel');
+    modalTitle.textContent = 'Choisir le mode de paiement';
+    
+    const paymentModalBody = document.getElementById('paymentModalBody');
+    paymentModalBody.innerHTML = `
+        <div class="mb-3">
+            <label class="form-label">Mode de paiement</label>
+            <select class="form-select" id="paymentMethodSelect">
+                <option value="Espèces">Espèces</option>
+                <option value="Carte bancaire">Carte bancaire</option>
+                <option value="Chèque">Chèque</option>
+                <option value="Virement">Virement</option>
+            </select>
+        </div>
+        <p>Total du panier: <strong>${currentCart.getTotal().toFixed(2)}€</strong> pour ${currentCart.items.length} article(s)</p>
+    `;
+    
+    // Définir l'action du bouton de confirmation
+    const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
+    
+    // Supprimer les anciens event listeners
+    const newConfirmBtn = confirmPaymentBtn.cloneNode(true);
+    confirmPaymentBtn.parentNode.replaceChild(newConfirmBtn, confirmPaymentBtn);
+    
+    // Ajouter le nouveau event listener
+    newConfirmBtn.addEventListener('click', () => {
+        const paymentMethod = document.getElementById('paymentMethodSelect').value;
+        
+        // Définir le mode de paiement
+        currentCart.setPaymentMethod(paymentMethod);
+        
+        // Créer une copie du panier actuel
+        const validatedCart = JSON.parse(JSON.stringify(currentCart));
+        validatedCart.date = new Date();
+        validatedCart.validated = true;
+        
+        // Ajouter à l'historique
+        salesHistory.push(validatedCart);
+        
+        // Réinitialiser le panier
+        currentCart = new Cart();
+        
+        // Sauvegarder et rafraîchir
+        saveToLocalStorage();
+        renderCart();
+        renderHistory();
+        showStats(currentStatsPeriod);
+        
+        // Fermer la modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
+        modal.hide();
+        
+        showToast('Panier validé avec succès', 'success');
+    });
+    
+    // Afficher la modal
+    const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
+    modal.show();
+}
 
         // Gestion de l'historique
         function renderHistory() {
@@ -969,41 +1045,46 @@
             }
         }
 
-        function showSaleDetails(saleIndex) {
-            const sale = salesHistory[saleIndex];
-            if (!sale) return;
-            
-            const saleDate = new Date(sale.date).toLocaleString();
-            const saleTotal = sale.items.reduce((total, item) => total + item.price, 0);
-            
-            document.getElementById('saleDetailsDate').textContent = `Date: ${saleDate}`;
-            document.getElementById('saleDetailsTotal').textContent = `Total: ${saleTotal.toFixed(2)}€`;
-            
-            // Afficher les articles
-            const saleItemsEl = document.getElementById('saleDetailsItems');
-            saleItemsEl.innerHTML = `
-                <div class="list-group">
-                    ${sale.items.map(item => `
-                        <div class="list-group-item d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-bold">${item.brand} - ${item.name}</div>
-                                <div class="small">
-                                    <span class="badge bg-secondary country-badge">${item.country}</span>
-                                </div>
-                            </div>
-                            <div>${item.price.toFixed(2)}€</div>
+// Mise à jour de la fonction showSaleDetails pour afficher le mode de paiement
+function showSaleDetails(saleIndex) {
+    const sale = salesHistory[saleIndex];
+    if (!sale) return;
+    
+    const saleDate = new Date(sale.date).toLocaleString();
+    const saleTotal = sale.items.reduce((total, item) => total + item.price, 0);
+    
+    // Ajouter l'information sur le mode de paiement
+    const paymentInfo = sale.paymentMethod ? `<div class="mb-2">Mode de paiement: <strong>${sale.paymentMethod}</strong></div>` : '';
+    
+    document.getElementById('saleDetailsDate').textContent = `Date: ${saleDate}`;
+    document.getElementById('saleDetailsTotal').innerHTML = `Total: ${saleTotal.toFixed(2)}€`;
+    document.getElementById('saleDetailsPayment').innerHTML = paymentInfo;
+    
+    // Afficher les articles
+    const saleItemsEl = document.getElementById('saleDetailsItems');
+    saleItemsEl.innerHTML = `
+        <div class="list-group">
+            ${sale.items.map(item => `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">${item.brand} - ${item.name}</div>
+                        <div class="small">
+                            <span class="badge bg-secondary country-badge">${item.country}</span>
                         </div>
-                    `).join('')}
+                    </div>
+                    <div>${item.price.toFixed(2)}€</div>
                 </div>
-            `;
-            
-            // Stocker la vente courante pour l'impression
-            currentSaleToPrint = sale;
-            
-            // Afficher la modal
-            const modal = new bootstrap.Modal(document.getElementById('saleDetailsModal'));
-            modal.show();
-        }
+            `).join('')}
+        </div>
+    `;
+    
+    // Stocker la vente courante pour l'impression
+    currentSaleToPrint = sale;
+    
+    // Afficher la modal
+    const modal = new bootstrap.Modal(document.getElementById('saleDetailsModal'));
+    modal.show();
+}
 
         function deleteSaleFromHistory(saleIndex) {
             showConfirmDialog(
@@ -1022,57 +1103,98 @@
         }
 
         // Impression et export
-        function printReceipt() {
-            // Préparer le contenu du ticket
-            const receiptDate = document.getElementById('receipt-date');
-            const receiptItems = document.getElementById('receipt-items');
-            const receiptTotal = document.getElementById('receipt-total');
+// Mise à jour de printReceipt et printSaleReceipt pour inclure les coordonnées et le mode de paiement
+function printReceipt() {
+    // Choisir d'abord le mode de paiement si non défini
+    if (!currentCart.paymentMethod) {
+        // Afficher une boîte de dialogue personnalisée pour choisir le mode de paiement
+        const modalTitle = document.getElementById('paymentModalLabel');
+        modalTitle.textContent = 'Choisir le mode de paiement pour l\'impression';
+        
+        const paymentModalBody = document.getElementById('paymentModalBody');
+        paymentModalBody.innerHTML = `
+            <div class="mb-3">
+                <label class="form-label">Mode de paiement</label>
+                <select class="form-select" id="paymentMethodSelect">
+                    <option value="Espèces">Espèces</option>
+                    <option value="Carte bancaire">Carte bancaire</option>
+                    <option value="Chèque">Chèque</option>
+                    <option value="Virement">Virement</option>
+                </select>
+            </div>
+            <p>Total du panier: <strong>${currentCart.getTotal().toFixed(2)}€</strong> pour ${currentCart.items.length} article(s)</p>
+        `;
+        
+        // Définir l'action du bouton de confirmation
+        const confirmPaymentBtn = document.getElementById('confirmPaymentBtn');
+        
+        // Supprimer les anciens event listeners
+        const newConfirmBtn = confirmPaymentBtn.cloneNode(true);
+        confirmPaymentBtn.parentNode.replaceChild(newConfirmBtn, confirmPaymentBtn);
+        
+        // Ajouter le nouveau event listener
+        newConfirmBtn.addEventListener('click', () => {
+            const paymentMethod = document.getElementById('paymentMethodSelect').value;
             
-            receiptDate.textContent = new Date().toLocaleString();
-            receiptItems.innerHTML = '';
+            // Définir le mode de paiement
+            currentCart.setPaymentMethod(paymentMethod);
             
-            currentCart.items.forEach(item => {
-                receiptItems.innerHTML += `
-                    <tr>
-                        <td style="text-align: left; padding: 5px;">${item.brand} - ${item.name}</td>
-                        <td style="text-align: right; padding: 5px;">${item.price.toFixed(2)}€</td>
-                    </tr>
-                `;
-            });
+            // Sauvegarder
+            saveToLocalStorage();
             
-            receiptTotal.textContent = `${currentCart.getTotal().toFixed(2)}€`;
+            // Fermer la modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
+            modal.hide();
             
-            // Imprimer
-            window.print();
-        }
+            // Continuer avec l'impression
+            doPrintReceipt();
+        });
+        
+        // Afficher la modal
+        const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
+        modal.show();
+    } else {
+        doPrintReceipt();
+    }
+}
 
-        function printSaleReceipt() {
-            if (!currentSaleToPrint) return;
-            
-            // Préparer le contenu du ticket
-            const receiptDate = document.getElementById('receipt-date');
-            const receiptItems = document.getElementById('receipt-items');
-            const receiptTotal = document.getElementById('receipt-total');
-            
-            receiptDate.textContent = new Date(currentSaleToPrint.date).toLocaleString();
-            receiptItems.innerHTML = '';
-            
-            currentSaleToPrint.items.forEach(item => {
-                receiptItems.innerHTML += `
-                    <tr>
-                        <td style="text-align: left; padding: 5px;">${item.brand} - ${item.name}</td>
-                        <td style="text-align: right; padding: 5px;">${item.price.toFixed(2)}€</td>
-                    </tr>
-                `;
-            });
-            
-            const saleTotal = currentSaleToPrint.items.reduce((total, item) => total + item.price, 0);
-            receiptTotal.textContent = `${saleTotal.toFixed(2)}€`;
-            
-            // Imprimer
-            window.print();
-        }
 
+function printSaleReceipt() {
+    if (!currentSaleToPrint) return;
+    
+    // Préparer le contenu du ticket
+    const receiptDate = document.getElementById('receipt-date');
+    const receiptCustomer = document.getElementById('receipt-customer');
+    const receiptItems = document.getElementById('receipt-items');
+    const receiptTotal = document.getElementById('receipt-total');
+    const receiptPayment = document.getElementById('receipt-payment');
+    const receiptNumber = document.getElementById('receipt-number');
+    
+    // Générer un numéro de facture basé sur la date de la vente
+    const saleDate = new Date(currentSaleToPrint.date);
+    const invoiceNumber = `F${saleDate.getFullYear()}${String(saleDate.getMonth() + 1).padStart(2, '0')}${String(saleDate.getDate()).padStart(2, '0')}-${String(saleDate.getHours()).padStart(2, '0')}${String(saleDate.getMinutes()).padStart(2, '0')}`;
+    
+    receiptDate.textContent = saleDate.toLocaleString();
+    receiptNumber.textContent = invoiceNumber;
+    receiptCustomer.innerHTML = ''; // Par défaut, pas d'information client
+    receiptItems.innerHTML = '';
+    
+    currentSaleToPrint.items.forEach(item => {
+        receiptItems.innerHTML += `
+            <tr>
+                <td style="text-align: left; padding: 5px;">${item.brand} - ${item.name}</td>
+                <td style="text-align: right; padding: 5px;">${item.price.toFixed(2)}€</td>
+            </tr>
+        `;
+    });
+    
+    const saleTotal = currentSaleToPrint.items.reduce((total, item) => total + item.price, 0);
+    receiptTotal.textContent = `${saleTotal.toFixed(2)}€`;
+    receiptPayment.textContent = currentSaleToPrint.paymentMethod || 'Non spécifié';
+    
+    // Imprimer
+    window.print();
+}
         // Export de données
         function exportHistoryCSV() {
             if (salesHistory.length === 0) {
