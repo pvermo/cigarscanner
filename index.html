@@ -582,37 +582,47 @@
             }
         }
 
-       class Cart {
-            constructor() {
-                this.items = [];
-                this.date = new Date();
-                this.validated = false;
-                this.paymentMethod = ""; // Nouvelle propriété pour le mode de paiement
-            }
+       // La définition actuelle de la classe Cart est incomplète
+// Elle n'a pas la méthode setPaymentMethod qui est appelée dans validateCart
+// Voici la version corrigée complète
 
-            addItem(cigar) {
-                this.items.push(cigar);
-            }
+class Cart {
+    constructor() {
+        this.items = [];
+        this.date = new Date();
+        this.validated = false;
+        this.paymentMethod = ""; // Propriété pour le mode de paiement
+    }
 
-            removeItem(id) {
-                const index = this.items.findIndex(item => item.id === id);
-                if (index !== -1) {
-                    this.items.splice(index, 1);
-                }
-            }
+    addItem(cigar) {
+        this.items.push(cigar);
+    }
 
-            getTotal() {
-                return this.items.reduce((total, item) => total + item.price, 0);
-            }
-
-            validate() {
-                this.validated = true;
-            }
-
-            clear() {
-                this.items = [];
-            }
+    removeItem(id) {
+        const index = this.items.findIndex(item => item.id === id);
+        if (index !== -1) {
+            this.items.splice(index, 1);
         }
+    }
+
+    getTotal() {
+        return this.items.reduce((total, item) => total + item.price, 0);
+    }
+
+    // Ajouter cette méthode manquante
+    setPaymentMethod(method) {
+        this.paymentMethod = method;
+    }
+
+    validate() {
+        this.validated = true;
+    }
+
+    clear() {
+        this.items = [];
+        this.paymentMethod = ""; // Réinitialiser aussi le mode de paiement
+    }
+}
 
         // Variables globales
         let currentCart = new Cart();
@@ -1157,7 +1167,42 @@ function printReceipt() {
         doPrintReceipt();
     }
 }
+// La fonction doPrintReceipt() est appelée dans printReceipt() mais n'est pas définie
+// Voici la fonction manquante à ajouter après printReceipt()
 
+function doPrintReceipt() {
+    // Préparer le contenu du ticket
+    const receiptDate = document.getElementById('receipt-date');
+    const receiptCustomer = document.getElementById('receipt-customer');
+    const receiptItems = document.getElementById('receipt-items');
+    const receiptTotal = document.getElementById('receipt-total');
+    const receiptPayment = document.getElementById('receipt-payment');
+    const receiptNumber = document.getElementById('receipt-number');
+    
+    // Générer un numéro de facture basé sur la date
+    const now = new Date();
+    const invoiceNumber = `F${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    receiptDate.textContent = now.toLocaleString();
+    receiptNumber.textContent = invoiceNumber;
+    receiptCustomer.innerHTML = ''; // Par défaut, pas d'information client
+    receiptItems.innerHTML = '';
+    
+    currentCart.items.forEach(item => {
+        receiptItems.innerHTML += `
+            <tr>
+                <td style="text-align: left; padding: 5px;">${item.brand} - ${item.name}</td>
+                <td style="text-align: right; padding: 5px;">${item.price.toFixed(2)}€</td>
+            </tr>
+        `;
+    });
+    
+    receiptTotal.textContent = `${currentCart.getTotal().toFixed(2)}€`;
+    receiptPayment.textContent = currentCart.paymentMethod || 'Non spécifié';
+    
+    // Imprimer
+    window.print();
+}
 
 function printSaleReceipt() {
     if (!currentSaleToPrint) return;
