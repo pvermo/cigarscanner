@@ -646,6 +646,13 @@ class Cart {
             // Initialisation des variables PDF
             window.jsPDF = window.jspdf.jsPDF;
         };
+        document.addEventListener('DOMContentLoaded', function() {
+    // Ajouter un écouteur d'événements sur l'onglet scanner
+    document.getElementById('scanner-tab').addEventListener('shown.bs.tab', function () {
+        // Démarrer automatiquement le scanner quand l'onglet est affiché
+        startScanner();
+    });
+});
 
         // Sauvegarde locale
         function saveToLocalStorage() {
@@ -693,9 +700,16 @@ class Cart {
         }
 
         // Navigation
-        function goToScanner() {
-            document.getElementById('scanner-tab').click();
-        }
+function goToScanner() {
+    // Naviguer vers l'onglet Scanner
+    document.getElementById('scanner-tab').click();
+    
+    // Ajouter un petit délai pour s'assurer que l'onglet est bien chargé avant de démarrer le scanner
+    setTimeout(() => {
+        // Démarrer automatiquement le scanner
+        startScanner();
+    }, 300);
+}
 
         // Gestion du scanner
         function startScanner() {
