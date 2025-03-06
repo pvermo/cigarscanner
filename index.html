@@ -1111,21 +1111,56 @@ function showSaleDetails(saleIndex) {
     modal.show();
 }
 
-        function deleteSaleFromHistory(saleIndex) {
-            showConfirmDialog(
-                'Supprimer la vente',
-                'Êtes-vous sûr de vouloir supprimer cette vente de l\'historique ?',
-                () => {
-                    if (saleIndex >= 0 && saleIndex < salesHistory.length) {
-                        salesHistory.splice(saleIndex, 1);
-                        saveToLocalStorage();
-                        renderHistory();
-                        showStats(currentStatsPeriod);
-                        showToast('Vente supprimée avec succès', 'warning');
-                    }
-                }
-            );
+function deleteSaleFromHistory(saleIndex) {
+    const sale = salesHistory[saleIndex];
+    if (!sale) return;
+    
+    // Créer une modal personnalisée
+    const modalTitle = document.getElementById('confirmModalLabel');
+    const modalBody = document.getElementById('confirmModalBody');
+    const confirmBtn = document.getElementById('confirmModalBtn');
+    
+    modalTitle.textContent = 'Supprimer la vente';
+    modalBody.innerHTML = `
+        <p>Êtes-vous sûr de vouloir supprimer cette vente de l'historique ?</p>
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="restockItemsCheck" checked>
+            <label class="form-check-label" for="restockItemsCheck">
+                Remettre les articles en stock (vente annulée)
+            </label>
+        </div>
+    `;
+    
+    // Supprimer les anciens event listeners
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    
+    // Ajouter le nouveau event listener
+    newConfirmBtn.addEventListener('click', () => {
+        const shouldRestock = document.getElementById('restockItemsCheck').checked;
+        
+        if (saleIndex >= 0 && saleIndex < salesHistory.length) {
+            // Si demandé, remettre les produits en stock
+            if (shouldRestock && typeof updateInventoryAfterSaleDeletion === 'function') {
+                updateInventoryAfterSaleDeletion(sale);
+            }
+            
+            // Supprimer la vente de l'historique
+            salesHistory.splice(saleIndex, 1);
+            saveToLocalStorage();
+            renderHistory();
+            showStats(currentStatsPeriod);
+            showToast(`Vente supprimée avec succès${shouldRestock ? ' et produits remis en stock' : ''}`, 'warning');
         }
+        
+        const modal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+        modal.hide();
+    });
+    
+    // Afficher la modal
+    const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    modal.show();
+}
 
         // Impression et export
 // Mise à jour de printReceipt et printSaleReceipt pour inclure les coordonnées et le mode de paiement

@@ -1177,18 +1177,27 @@ validateCart = function() {
     // Appeler la fonction originale si tout est en stock
     originalValidateCart();
     
-    // Mise à jour du stock après validation du panier
-    if (typeof initializeInventoryModule === 'function') {
-        updateInventoryAfterSale();
-    }
+// Mettre un petit délai pour s'assurer que la vente est bien enregistrée
+    setTimeout(function() {
+        // Mise à jour du stock après validation du panier
+        if (typeof updateInventoryAfterSale === 'function') {
+            updateInventoryAfterSale();
+        }
+    }, 500);
 };
 
 // Mettre à jour le stock après une vente
 function updateInventoryAfterSale() {
+    console.log("Mise à jour de l'inventaire après vente");
     // Récupérer le dernier panier validé
     const lastSale = salesHistory[salesHistory.length - 1];
     
-    if (!lastSale || !lastSale.items || lastSale.items.length === 0) return;
+    if (!lastSale || !lastSale.items || lastSale.items.length === 0) {
+        console.log("Aucune vente valide trouvée");
+        return;
+    }
+    
+    console.log("Vente trouvée avec", lastSale.items.length, "articles");
     
     lastSale.items.forEach(item => {
         // Trouver le produit dans le catalogue
@@ -1197,22 +1206,33 @@ function updateInventoryAfterSale() {
         );
         
         if (catalogItem) {
+            console.log("Produit trouvé dans le catalogue:", catalogItem.brand, catalogItem.name);
             // Mettre à jour le stock
             const inventoryItem = inventoryItems.find(i => i.productId === catalogItem.id);
             
-            if (inventoryItem && inventoryItem.quantity > 0) {
-                const newQuantity = inventoryItem.quantity - 1;
-                const adjustment = new StockAdjustment(
-                    -1,
-                    'sale',
-                    `Vente #${salesHistory.length}`
-                );
-                
-                inventoryItem.quantity = newQuantity;
-                inventoryItem.addHistory(adjustment);
-                inventoryItem.rotationScore += 1; // Incrémenter le score de rotation
-                inventoryItem.updateCategory(); // Mettre à jour la catégorie
+            if (inventoryItem) {
+                console.log("État du stock avant:", inventoryItem.quantity);
+                if (inventoryItem.quantity > 0) {
+                    const newQuantity = inventoryItem.quantity - 1;
+                    const adjustment = new StockAdjustment(
+                        -1,
+                        'sale',
+                        `Vente #${salesHistory.length}`
+                    );
+                    
+                    inventoryItem.quantity = newQuantity;
+                    inventoryItem.addHistory(adjustment);
+                    inventoryItem.rotationScore += 1; // Incrémenter le score de rotation
+                    inventoryItem.updateCategory(); // Mettre à jour la catégorie
+                    console.log("Stock mis à jour:", newQuantity);
+                } else {
+                    console.log("Impossible de déduire: stock insuffisant");
+                }
+            } else {
+                console.log("Produit non trouvé en stock");
             }
+        } else {
+            console.log("Produit non trouvé dans le catalogue:", item.brand, item.name);
         }
     });
     
@@ -1225,6 +1245,50 @@ function updateInventoryAfterSale() {
     checkLowStockAlerts();
 }
 
+// Mettre à jour le stock après suppression d'une vente (remise en stock)
+function updateInventoryAfterSaleDeletion(sale) {
+    if (!sale || !sale.items || sale.items.length === 0) return;
+    
+    sale.items.forEach(item => {
+        // Trouver le produit dans le catalogue
+        const catalogItem = productCatalog.find(
+            p => p.brand === item.brand && p.name === item.name
+        );
+        
+        if (catalogItem) {
+            // Mettre à jour le stock
+            let inventoryItem = inventoryItems.find(i => i.productId === catalogItem.id);
+            
+            // Si l'article n'existe pas en stock, le créer
+            if (!inventoryItem) {
+                inventoryItem = new InventoryItem(catalogItem.id, 0, 5);
+                inventoryItems.push(inventoryItem);
+            }
+            
+            // Ajouter la quantité remise en stock (+1)
+            const newQuantity = inventoryItem.quantity + 1;
+            const adjustment = new StockAdjustment(
+                1,
+                'return',
+                'Vente annulée et produit remis en stock'
+            );
+            
+            inventoryItem.quantity = newQuantity;
+            inventoryItem.addHistory(adjustment);
+            
+            // Ajustement du score de rotation (-1 si possible)
+            if (inventoryItem.rotationScore > 0) {
+                inventoryItem.rotationScore -= 1;
+                inventoryItem.updateCategory();
+            }
+        }
+    });
+    
+    // Sauvegarder et rafraîchir
+    saveInventoryData();
+    renderInventory();
+    updateInventoryStats();
+}
 // Initialisation
 document.addEventListener('DOMContentLoaded', function() {
     if (typeof initializeInventoryModule === 'function') {
