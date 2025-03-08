@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Le Diplomate - Gestion des Cigares</title>
+    
+    <!-- Bibliothèques externes en CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <h1>Le Diplomate - Gestion des Cigares</h1>
+    </header>
+    
+    <nav>
+        <ul>
+            <li><a href="#" data-module="ventes" class="active">Ventes</a></li>
+            <li><a href="#" data-module="stock">Stock</a></li>
+            <li><a href="#" data-module="produits">Catalogue</a></li>
+            <li><a href="#" data-module="fournisseurs">Fournisseurs</a></li>
+            <li><a href="#" data-module="statistiques">Statistiques</a></li>
+            <li><a href="#" data-module="etiquettes">Étiquettes</a></li>
+        </ul>
+    </nav>
+    
+    <main id="app-container">
+        <!-- Le contenu sera chargé dynamiquement ici selon le module actif -->
+        <div id="loader" class="hidden">Chargement en cours...</div>
+    </main>
+    
+    <!-- Modales -->
+    <div id="modal-container" class="modal-container hidden">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+    
+    <!-- Templates des modules -->
+    
+    <!-- Template Ventes -->
+    <template id="tpl-ventes">
+        <div class="module-container">
+            <h2>Gestion des Ventes</h2>
+            
+            <div class="sales-container">
+                <div class="sales-scanner">
+                    <h3>Scanner QR Code</h3>
+                    <div id="scanner-container">
+                        <video id="scanner-video" class="hidden"></video>
+                        <canvas id="scanner-canvas" width="320" height="240"></canvas>
+                        <div class="scanner-controls">
+                            <button id="start-scanner" class="btn primary">Activer Scanner</button>
+                            <button id="stop-scanner" class="btn secondary hidden">Arrêter Scanner</button>
+                        </div>
+                    </div>
+                    <div class="manual-search">
+                        <h3>Recherche Manuelle</h3>
+                        <div class="search-bar">
+                            <input type="text" id="product-search" placeholder="Rechercher un produit...">
+                            <button id="search-btn" class="btn primary">Rechercher</button>
+                        </div>
+                        <div id="search-results" class="search-results"></div>
+                    </div>
+                </div>
+                
+                <div class="sales-cart">
+                    <h3>Panier</h3>
+                    <div id="cart-items" class="cart-items">
+                        <div class="cart-empty">Le panier est vide</div>
+                    </div>
+                    <div class="cart-summary">
+                        <div class="cart-total">Total: <span id="cart-total-amount">0.00</span>€</div>
+                        <button id="complete-sale" class="btn primary">Valider la vente</button>
+                        <button id="clear-cart" class="btn secondary">Vider le panier</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sales-history">
+                <h3>Historique des ventes récentes</h3>
+                <div class="sales-list" id="sales-history-list"></div>
+            </div>
+        </div>
+    </template>
+    
+    <!-- Template Stock -->
+    <template id="tpl-stock">
+        <div class="module-container">
+            <h2>Gestion du Stock</h2>
+            
+            <div class="actions-bar">
+                <div class="search-bar">
+                    <input type="text" id="stock-search" placeholder="Rechercher un produit...">
+                    <button id="stock-search-btn" class="btn primary">Rechercher</button>
+                </div>
+                <div class="action-buttons">
+                    <button id="add-stock-item" class="btn secondary">Ajouter Produit</button>
+                    <button id="import-stock" class="btn secondary">Importer Excel</button>
+                    <button id="export-stock" class="btn secondary">Exporter Excel</button>
+                </div>
+            </div>
+            
+            <div class="stock-table-container">
+                <table id="stock-table" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Marque</th>
+                            <th>Nom</th>
+                            <th>Origine</th>
+                            <th>Quantité</th>
+                            <th>Prix</th>
+                            <th>Fournisseur</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stock-items">
+                        <!-- Les éléments de stock seront ajoutés ici dynamiquement -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="pagination" id="stock-pagination"></div>
+        </div>
+    </template>
+    
+    <!-- Autres templates (produits, fournisseurs, statistiques, étiquettes) -->
+    
+    <!-- Template Produits -->
+    <template id="tpl-produits">
+        <div class="module-container">
+            <h2>Catalogue Produits</h2>
+            
+            <div class="actions-bar">
+                <div class="search-bar">
+                    <input type="text" id="product-catalog-search" placeholder="Rechercher un produit...">
+                    <button id="product-search-btn" class="btn primary">Rechercher</button>
+                </div>
+                <div class="action-buttons">
+                    <button id="add-product-item" class="btn secondary">Ajouter Produit</button>
+                    <button id="import-products" class="btn secondary">Importer Excel</button>
+                    <button id="export-products" class="btn secondary">Exporter Excel</button>
+                </div>
+            </div>
+            
+            <div class="products-table-container">
+                <table id="products-table" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Marque</th>
+                            <th>Nom</th>
+                            <th>Origine</th>
+                            <th>Vitole</th>
+                            <th>Cape</th>
+                            <th>Sous-cape</th>
+                            <th>Tripe</th>
+                            <th>Force</th>
+                            <th>Prix</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="product-items">
+                        <!-- Les produits seront ajoutés ici dynamiquement -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="pagination" id="products-pagination"></div>
+        </div>
+    </template>
+    
+    <!-- Template Fournisseurs -->
+    <template id="tpl-fournisseurs">
+        <div class="module-container">
+            <h2>Gestion des Fournisseurs</h2>
+            
+            <div class="actions-bar">
+                <button id="add-supplier" class="btn secondary">Ajouter Fournisseur</button>
+                <button id="import-suppliers" class="btn secondary">Importer Excel</button>
+                <button id="export-suppliers" class="btn secondary">Exporter Excel</button>
+            </div>
+            
+            <div class="suppliers-table-container">
+                <table id="suppliers-table" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Contact</th>
+                            <th>Email</th>
+                            <th>Téléphone</th>
+                            <th>Pays</th>
+                            <th>Nombre de produits</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="supplier-items">
+                        <!-- Les fournisseurs seront ajoutés ici dynamiquement -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </template>
+    
+    <!-- Template Statistiques -->
+    <template id="tpl-statistiques">
+        <div class="module-container">
+            <h2>Statistiques & Rapports</h2>
+            
+            <div class="filter-bar">
+                <div class="filter-group">
+                    <label for="stats-date-from">Du:</label>
+                    <input type="date" id="stats-date-from">
+                </div>
+                <div class="filter-group">
+                    <label for="stats-date-to">Au:</label>
+                    <input type="date" id="stats-date-to">
+                </div>
+                <div class="filter-group">
+                    <label for="stats-brand">Marque:</label>
+                    <select id="stats-brand">
+                        <option value="">Toutes</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="stats-supplier">Fournisseur:</label>
+                    <select id="stats-supplier">
+                        <option value="">Tous</option>
+                    </select>
+                </div>
+                <button id="apply-filters" class="btn primary">Appliquer</button>
+                <button id="export-stats" class="btn secondary">Exporter Excel</button>
+            </div>
+            
+            <div class="stats-dashboard">
+                <div class="stats-card">
+                    <h3>Ventes totales</h3>
+                    <div class="stat-value" id="total-sales">0.00€</div>
+                </div>
+                <div class="stats-card">
+                    <h3>Produits vendus</h3>
+                    <div class="stat-value" id="products-sold">0</div>
+                </div>
+                <div class="stats-card">
+                    <h3>Panier moyen</h3>
+                    <div class="stat-value" id="avg-cart">0.00€</div>
+                </div>
+                <div class="stats-card">
+                    <h3>Top marque</h3>
+                    <div class="stat-value" id="top-brand">-</div>
+                </div>
+            </div>
+            
+            <div class="charts-container">
+                <div class="chart-box">
+                    <h3>Ventes par marque</h3>
+                    <canvas id="brand-sales-chart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <h3>Évolution des ventes</h3>
+                    <canvas id="sales-trend-chart"></canvas>
+                </div>
+            </div>
+            
+            <div class="stats-table-container">
+                <h3>Détail des ventes</h3>
+                <table id="sales-details-table" class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Marque</th>
+                            <th>Produit</th>
+                            <th>Quantité</th>
+                            <th>Prix unitaire</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sales-details-items">
+                        <!-- Les détails des ventes seront ajoutés ici -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </template>
+    
+    <!-- Template Étiquettes (intégration du module existant) -->
+    <template id="tpl-etiquettes">
+        <div class="module-container" id="etiquettes-module">
+            <!-- Ce contenu sera remplacé par l'interface du générateur d'étiquettes existant -->
+            <h2>Générateur d'Étiquettes de Cigares</h2>
+            <div id="etiquettes-container">
+                <!-- Le module d'étiquettes existant sera intégré ici -->
+            </div>
+        </div>
+    </template>
+    
+    <!-- Templates des formulaires modaux -->
+    
+    <!-- Formulaire d'ajout/modification de produit en stock -->
+    <template id="tpl-modal-stock-form">
+        <h3>Ajouter/Modifier Stock</h3>
+        <form id="stock-form">
+            <input type="hidden" id="stock-id">
+            <div class="form-group">
+                <label for="stock-product">Produit:</label>
+                <select id="stock-product" required></select>
+            </div>
+            <div class="form-group">
+                <label for="stock-quantity">Quantité:</label>
+                <input type="number" id="stock-quantity" min="0" required>
+            </div>
+            <div class="form-group">
+                <label for="stock-supplier">Fournisseur:</label>
+                <select id="stock-supplier" required></select>
+            </div>
+            <div class="form-group">
+                <label for="stock-price">Prix de vente (€):</label>
+                <input type="number" id="stock-price" min="0" step="0.01" required>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn primary">Enregistrer</button>
+                <button type="button" class="btn secondary close-modal">Annuler</button>
+            </div>
+        </form>
+    </template>
+    
+    <!-- Formulaire d'ajout/modification de produit au catalogue -->
+    <template id="tpl-modal-product-form">
+        <h3>Ajouter/Modifier Produit</h3>
+        <form id="product-form">
+            <input type="hidden" id="product-id">
+            <div class="form-group">
+                <label for="product-brand">Marque:</label>
+                <input type="text" id="product-brand" required>
+            </div>
+            <div class="form-group">
+                <label for="product-name">Nom:</label>
+                <input type="text" id="product-name" required>
+            </div>
+            <div class="form-group">
+                <label for="product-country">Pays d'origine:</label>
+                <input type="text" id="product-country">
+            </div>
+            <div class="form-group">
+                <label for="product-vitole">Vitole:</label>
+                <input type="text" id="product-vitole">
+            </div>
+            <div class="form-group">
+                <label for="product-wrapper">Cape:</label>
+                <input type="text" id="product-wrapper">
+            </div>
+            <div class="form-group">
+                <label for="product-binder">Sous-cape:</label>
+                <input type="text" id="product-binder">
+            </div>
+            <div class="form-group">
+                <label for="product-filler">Tripe:</label>
+                <input type="text" id="product-filler">
+            </div>
+            <div class="form-group">
+                <label for="product-strength">Force/Intensité:</label>
+                <select id="product-strength">
+                    <option value="Légère">Légère</option>
+                    <option value="Légère-Moyenne">Légère-Moyenne</option>
+                    <option value="Moyenne" selected>Moyenne</option>
+                    <option value="Moyenne-Forte">Moyenne-Forte</option>
+                    <option value="Forte">Forte</option>
+                    <option value="Très Forte">Très Forte</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn primary">Enregistrer</button>
+                <button type="button" class="btn secondary close-modal">Annuler</button>
+            </div>
+        </form>
+    </template>
+    
+    <!-- Formulaire d'ajout/modification de fournisseur -->
+    <template id="tpl-modal-supplier-form">
+        <h3>Ajouter/Modifier Fournisseur</h3>
+        <form id="supplier-form">
+            <input type="hidden" id="supplier-id">
+            <div class="form-group">
+                <label for="supplier-name">Nom:</label>
+                <input type="text" id="supplier-name" required>
+            </div>
+            <div class="form-group">
+                <label for="supplier-contact">Contact:</label>
+                <input type="text" id="supplier-contact">
+            </div>
+            <div class="form-group">
+                <label for="supplier-email">Email:</label>
+                <input type="email" id="supplier-email">
+            </div>
+            <div class="form-group">
+                <label for="supplier-phone">Téléphone:</label>
+                <input type="tel" id="supplier-phone">
+            </div>
+            <div class="form-group">
+                <label for="supplier-country">Pays:</label>
+                <input type="text" id="supplier-country">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn primary">Enregistrer</button>
+                <button type="button" class="btn secondary close-modal">Annuler</button>
+            </div>
+        </form>
+    </template>
+    
+    <!-- Formulaire de finalisation de vente -->
+    <template id="tpl-modal-complete-sale">
+        <h3>Finaliser la vente</h3>
+        <div class="sale-summary">
+            <h4>Récapitulatif</h4>
+            <div id="sale-items-summary"></div>
+            <div class="sale-total">
+                <strong>Total: </strong><span id="sale-total-amount">0.00</span>€
+            </div>
+        </div>
+        <form id="complete-sale-form">
+            <div class="form-group">
+                <label for="sale-payment-method">Méthode de paiement:</label>
+                <select id="sale-payment-method" required>
+                    <option value="Espèces">Espèces</option>
+                    <option value="Carte bancaire">Carte bancaire</option>
+                    <option value="Autre">Autre</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="sale-notes">Notes:</label>
+                <textarea id="sale-notes"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn primary">Valider</button>
+                <button type="button" class="btn secondary close-modal">Annuler</button>
+            </div>
+        </form>
+    </template>
+    
+    <!-- JavaScript -->
+    <script src="js/app.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/ventes.js"></script>
+    <script src="js/stock.js"></script>
+    <script src="js/produits.js"></script>
+    <script src="js/fournisseurs.js"></script>
+    <script src="js/statistiques.js"></script>
+    <script src="js/etiquettes.js"></script>
+    <script>
+      // Initialisation de l'application après le chargement de tous les scripts
+      document.addEventListener('DOMContentLoaded', function() {
+        // Initialiser le gestionnaire de données
+        LeDiplomate.dataManager.initialize();
+        
+        // Initialiser les événements de navigation
+        LeDiplomate.initNavigation();
+        
+        // Charger le module par défaut
+        LeDiplomate.loadModule(LeDiplomate.state.currentModule);
+      });
+    </script>
+</body>
+</html>
